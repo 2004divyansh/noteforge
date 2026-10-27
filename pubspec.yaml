@@ -21,7 +21,7 @@ dependencies:
   share_plus: ^10.1.4
   pdf: ^3.11.2
   printing: ^5.13.5
-  local_auth: ^2.3.0
+  local_auth: any
   flex_color_scheme: ^8.1.1
   flutter_animate: ^4.5.2
   file_picker: ^8.1.7
