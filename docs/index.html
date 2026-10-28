@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoteForge — Student Note-Taking App</title>
+  <meta name="description" content="A powerful, local-first note-taking app designed for students with rich text, folders, tags, math support, and offline privacy.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #6750A4;
+      --primary-hover: #7b62be;
+      --primary-light: #EADDFF;
+      --surface: #0f0d15;
+      --surface-card: #1a1724;
+      --surface-card-hover: #231f31;
+      --border: #2e283f;
+      --text: #f5f2fd;
+      --text-muted: #a69ebd;
+      --accent: #D0BCFF;
+      --accent-green: #4ade80;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--surface);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background gradient glow */
+    .glow-bg {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(103, 80, 164, 0.35) 0%, rgba(15, 13, 21, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(16px);
+      background: rgba(15, 13, 21, 0.85);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), #9a82db);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 14px rgba(103, 80, 164, 0.4);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    /* Hero Section */
+    .hero {
+      position: relative;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 5.5rem 1.5rem 3.5rem;
+      text-align: center;
+      z-index: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(103, 80, 164, 0.2);
+      border: 1px solid rgba(208, 188, 255, 0.25);
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 1.75rem;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-green);
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 5.5vw, 4.2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(180deg, #ffffff 30%, #c4b5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-sub {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.6;
+    }
+
+    .cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.95rem 1.85rem;
+      border-radius: 14px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(103, 80, 164, 0.45);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(103, 80, 164, 0.6);
+    }
+
+    .btn-secondary {
+      background: var(--surface-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-card-hover);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .btn-icon {
+      font-size: 1.25rem;
+    }
+
+    .release-meta {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+    }
+
+    /* Mockup Preview */
+    .preview-container {
+      max-width: 960px;
+      margin: 2.5rem auto 4.5rem;
+      padding: 0 1.5rem;
+    }
+
+    .app-window {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+    }
+
+    .window-header {
+      background: #14111d;
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .window-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+
+    .window-title {
+      margin: 0 auto;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .app-ui {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 440px;
+      text-align: left;
+    }
+
+    @media (max-width: 768px) {
+      .app-ui { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    .sidebar {
+      background: #15121e;
+      border-right: 1px solid var(--border);
+      padding: 1.25rem;
+    }
+
+    .sidebar-section {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .sidebar-item.active {
+      background: rgba(103, 80, 164, 0.25);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .editor-view {
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .note-mock-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .note-mock-tags {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .tag-chip {
+      background: rgba(208, 188, 255, 0.15);
+      color: var(--accent);
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .note-mock-body {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .code-block {
+      background: #0d0b13;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #e2d9f3;
+      margin-top: 0.5rem;
+    }
+
+    /* Features Grid */
+    .features-section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 4rem 1.5rem;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 3.5rem;
+    }
+
+    .section-title {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-sub {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      transition: all 0.25s ease;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(103, 80, 164, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+
+    /* How to Install Section */
+    .install-section {
+      max-width: 800px;
+      margin: 2rem auto 5rem;
+      padding: 2.5rem 2rem;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+    }
+
+    .install-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .step-text h4 {
+      font-size: 1.05rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .step-text p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-bg"></div>
+
+  <header>
+    <div class="nav-container">
+      <a href="#" class="brand">
+        <div class="brand-icon">📝</div>
+        NoteForge
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#install">How to Install</a>
+        <a href="#download" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="badge">
+        <div class="badge-dot"></div>
+        <span>v1.0.0 Stable Release</span>
+      </div>
+      <h1>The Local-First Note App<br>Crafted for Students</h1>
+      <p class="hero-sub">
+        NoteForge combines rich text, Markdown, code blocks, color-coded folders, and SQLite speed. Zero cloud trackers. Fully offline.
+      </p>
+
+      <div class="cta-group" id="download">
+        <!-- Direct Android APK Download Button -->
+        <a href="https://github.com/2004divyansh/FactWise-Assignment/releases/latest/download/app-release.apk" class="btn btn-primary" id="apkDownloadBtn">
+          <span class="btn-icon">🤖</span>
+          <span>Download APK (Android)</span>
+        </a>
+
+        <!-- Direct Windows .exe Download Button -->
+        <a href="https://github.com/2004divyansh/FactWise-Assignment/releases/latest/download/noteforge-windows.zip" class="btn btn-secondary">
+          <span class="btn-icon">🪟</span>
+          <span>Download for Windows (.exe)</span>
+        </a>
+      </div>
+
+      <div class="release-meta">
+        <span>✓ 100% Free & Open Source</span>
+        <span>✓ No Play Store account required</span>
+        <span>✓ Works fully offline</span>
+      </div>
+    </section>
+
+    <!-- App Interactive Mockup -->
+    <section class="preview-container">
+      <div class="app-window">
+        <div class="window-header">
+          <div class="window-dot dot-red"></div>
+          <div class="window-dot dot-yellow"></div>
+          <div class="window-dot dot-green"></div>
+          <div class="window-title">NoteForge — Algorithms & Data Structures</div>
+        </div>
+        <div class="app-ui">
+          <div class="sidebar">
+            <div class="sidebar-section">Notebooks</div>
+            <div class="sidebar-item active">📁 Computer Science (12)</div>
+            <div class="sidebar-item">📁 Mathematics (8)</div>
+            <div class="sidebar-item">📁 Physics (5)</div>
+            <div class="sidebar-section" style="margin-top: 1.5rem;">Tags</div>
+            <div class="sidebar-item">🏷️ Exam Prep</div>
+            <div class="sidebar-item">🏷️ Formulas</div>
+            <div class="sidebar-item">🏷️ Homework</div>
+          </div>
+          <div class="editor-view">
+            <div class="note-mock-title">Binary Search & Graph Traversal Notes</div>
+            <div class="note-mock-tags">
+              <span class="tag-chip">#ExamPrep</span>
+              <span class="tag-chip">#Algorithms</span>
+            </div>
+            <p class="note-mock-body">
+              Binary search operates over a sorted array in <strong>O(log n)</strong> time complexity by repeatedly dividing the search interval in half.
+            </p>
+            <div class="code-block">
+// Binary search in O(log n)
+int binarySearch(List&lt;int&gt; arr, int target) {
+  int low = 0, high = arr.length - 1;
+  while (low &lt;= high) {
+    int mid = low + (high - low) ~/ 2;
+    if (arr[mid] == target) return mid;
+    if (arr[mid] &lt; target) low = mid + 1;
+    else high = mid - 1;
+  }
+  return -1;
+}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Grid -->
+    <section class="features-section" id="features">
+      <div class="section-header">
+        <h2 class="section-title">Everything you need to ace your studies</h2>
+        <p class="section-sub">Built from the ground up for speed, student focus, and privacy.</p>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-icon">⚡</div>
+          <h3 class="card-title">Local-First & Offline</h3>
+          <p class="card-desc">All your notes live right on your device in a high-speed SQLite database. Instant search with zero loading spinners.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">📚</div>
+          <h3 class="card-title">Folders & Tagging</h3>
+          <p class="card-desc">Organize courses by semester and subject with customizable colors. Filter by multi-select tags in seconds.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">💻</div>
+          <h3 class="card-title">Code Syntax Highlighting</h3>
+          <p class="card-desc">Format programming code snippets seamlessly inside your lecture notes with syntax highlighting.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">🔒</div>
+          <h3 class="card-title">Biometric App Lock</h3>
+          <p class="card-desc">Protect your personal study diary with fingerprint, PIN, or Face ID security right on your phone.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">📄</div>
+          <h3 class="card-title">Export to PDF & Markdown</h3>
+          <p class="card-desc">Share clean formatted PDF handouts with classmates, or export your entire knowledge base to Markdown.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">🌗</div>
+          <h3 class="card-title">Material 3 Dark Mode</h3>
+          <p class="card-desc">Beautiful deep-purple night theme easy on the eyes during late-night cramming sessions.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How to Install APK Guide -->
+    <section class="install-section" id="install">
+      <h3 class="install-title">How to Install NoteForge on Android</h3>
+      <div class="steps">
+        <div class="step-item">
+          <div class="step-num">1</div>
+          <div class="step-text">
+            <h4>Download the APK</h4>
+            <p>Click the <strong>Download APK</strong> button above on your Android phone.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div class="step-text">
+            <h4>Allow Installation</h4>
+            <p>If your browser prompts <em>"File might be harmful"</em> or <em>"Install unknown apps"</em>, tap <strong>Download anyway</strong> and enable permission for your browser.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div class="step-text">
+            <h4>Open and Install</h4>
+            <p>Tap the downloaded file in your notification bar and tap <strong>Install</strong>. NoteForge is ready to take notes!</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2026 NoteForge. Open source student note-taking application.</p>
+    <p style="margin-top: 0.5rem;"><a href="https://github.com/2004divyansh/FactWise-Assignment" target="_blank">View GitHub Repository</a></p>
+  </footer>
+</body>
+</html>
