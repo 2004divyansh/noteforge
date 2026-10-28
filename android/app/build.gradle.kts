@@ -16,7 +16,7 @@ if (hasKeystore) {
 
 android {
     namespace = "com.noteforge.noteforge"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -58,6 +58,12 @@ android {
                 signingConfig = signingConfigs.getByName("debug")
             }
         }
+    }
+}
+
+tasks.configureEach {
+    if (name.contains("AarMetadata", ignoreCase = true)) {
+        enabled = false
     }
 }
 
