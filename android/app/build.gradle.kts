@@ -9,7 +9,8 @@ plugins {
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
-if (keystorePropertiesFile.exists()) {
+val hasKeystore = keystorePropertiesFile.exists()
+if (hasKeystore) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
@@ -25,34 +26,26 @@ android {
 
     defaultConfig {
         applicationId = "com.noteforge.noteforge"
-        minSdk = flutter.minSdkVersion
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     signingConfigs {
-        create("release") {
-            val keyAliasVal = keystoreProperties.getProperty("keyAlias")
-            val keyPasswordVal = keystoreProperties.getProperty("keyPassword")
-            val storeFileVal = keystoreProperties.getProperty("storeFile")
-            val storePasswordVal = keystoreProperties.getProperty("storePassword")
-
-            if (storeFileVal != null) {
-                keyAlias = keyAliasVal
-                keyPassword = keyPasswordVal
-                storeFile = file(storeFileVal)
-                storePassword = storePasswordVal
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
+        if (hasKeystore && keystoreProperties.getProperty("storeFile") != null) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
     }
 
     buildTypes {
         release {
-            val hasKeystore = keystorePropertiesFile.exists() && keystoreProperties.getProperty("storeFile") != null
-            if (hasKeystore) {
+            if (hasKeystore && keystoreProperties.getProperty("storeFile") != null) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 signingConfig = signingConfigs.getByName("debug")

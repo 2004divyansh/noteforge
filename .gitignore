@@ -52,3 +52,6 @@ key.properties
 **/key.properties
 *.jks
 *.keystore
+
+# Local cache
+.cache/
