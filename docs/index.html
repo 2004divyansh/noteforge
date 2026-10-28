@@ -217,6 +217,39 @@
       align-items: center;
       justify-content: center;
       gap: 1.25rem;
+      margin-top: 1.25rem;
+    }
+
+    /* Smart OS Detection UI */
+    .os-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(208, 188, 255, 0.12);
+      border: 1px solid rgba(208, 188, 255, 0.28);
+      padding: 0.35rem 0.9rem;
+      border-radius: 20px;
+      margin-bottom: 1rem;
+    }
+
+    .platform-switch {
+      margin-top: 0.85rem;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .platform-switch a {
+      color: var(--accent);
+      text-decoration: underline;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .platform-switch a:hover {
+      color: #fff;
     }
 
     /* Mockup Preview */
@@ -495,7 +528,7 @@
         <a href="#features">Features</a>
         <a href="#install">Open Source</a>
         <a href="https://github.com/2004divyansh/noteforge" target="_blank">GitHub</a>
-        <a href="#download" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Download</a>
+        <a href="#download" class="btn btn-primary" id="navDownloadBtn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Download</a>
       </div>
     </div>
   </header>
@@ -511,18 +544,28 @@
         NoteForge combines rich text, Markdown, code blocks, color-coded folders, and SQLite speed. Zero cloud trackers. Fully offline.
       </p>
 
-      <div class="cta-group" id="download">
-        <!-- Direct Android APK Download Button -->
-        <a href="https://github.com/2004divyansh/noteforge/releases/latest/download/app-release.apk" class="btn btn-primary" id="apkDownloadBtn">
-          <span class="btn-icon">🤖</span>
-          <span>Download APK (Android)</span>
-        </a>
+      <div id="download">
+        <!-- Dynamic Detected OS Badge -->
+        <div id="osBadge" class="os-badge" style="display: none;">
+          <span id="osBadgeIcon">💻</span>
+          <span id="osBadgeText">Detected Device</span>
+        </div>
 
-        <!-- Direct Windows .exe Download Button -->
-        <a href="https://github.com/2004divyansh/noteforge/releases/latest/download/noteforge-windows.zip" class="btn btn-secondary">
-          <span class="btn-icon">🪟</span>
-          <span>Download for Windows (.exe)</span>
-        </a>
+        <div class="cta-group" id="ctaGroup">
+          <!-- Android APK Download Button -->
+          <a href="https://github.com/2004divyansh/noteforge/releases/latest/download/app-release.apk" class="btn btn-primary" id="apkDownloadBtn">
+            <span class="btn-icon">🤖</span>
+            <span>Download APK (Android)</span>
+          </a>
+
+          <!-- Windows .exe Download Button -->
+          <a href="https://github.com/2004divyansh/noteforge/releases/latest/download/noteforge-windows.zip" class="btn btn-primary" id="winDownloadBtn">
+            <span class="btn-icon">🪟</span>
+            <span>Download for Windows (.exe)</span>
+          </a>
+        </div>
+
+        <p class="platform-switch" id="platformSwitch"></p>
       </div>
 
       <div class="release-meta">
@@ -658,6 +701,117 @@ int binarySearch(List&lt;int&gt; arr, int target) {
     <p>© 2026 NoteForge. Open source student note-taking application.</p>
     <p style="margin-top: 0.5rem;"><a href="https://github.com/2004divyansh/noteforge" target="_blank">View GitHub Repository</a></p>
   </footer>
+  <script>
+    (function() {
+      const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+      const isAndroid = /Android/i.test(ua);
+      const isWindows = /Windows|Win32|Win64|WOW64/i.test(ua);
+      const isIOS = /iPhone|iPad|iPod/i.test(ua);
+      const isMac = /Macintosh|Mac OS X/i.test(ua) && !isIOS;
+      const isLinux = /Linux/i.test(ua) && !isAndroid;
+
+      const apkBtn = document.getElementById('apkDownloadBtn');
+      const winBtn = document.getElementById('winDownloadBtn');
+      const osBadge = document.getElementById('osBadge');
+      const osBadgeIcon = document.getElementById('osBadgeIcon');
+      const osBadgeText = document.getElementById('osBadgeText');
+      const platformSwitch = document.getElementById('platformSwitch');
+      const navDownloadBtn = document.getElementById('navDownloadBtn');
+
+      let currentPlatform = 'unknown';
+
+      if (isAndroid) {
+        currentPlatform = 'android';
+        // Android visitors only see Android APK download
+        apkBtn.style.display = 'inline-flex';
+        apkBtn.className = 'btn btn-primary';
+        winBtn.style.display = 'none';
+
+        osBadge.style.display = 'inline-flex';
+        osBadgeIcon.textContent = '📱';
+        osBadgeText.textContent = 'Detected your device: Android (7.0+)';
+
+        platformSwitch.innerHTML = 'Need NoteForge on PC? <a id="toggleAlt">Show Windows download</a>';
+        if (navDownloadBtn) {
+          navDownloadBtn.href = apkBtn.href;
+          navDownloadBtn.textContent = 'Download APK';
+        }
+      } else if (isWindows) {
+        currentPlatform = 'windows';
+        // Windows visitors only see Windows Application download
+        winBtn.style.display = 'inline-flex';
+        winBtn.className = 'btn btn-primary';
+        apkBtn.style.display = 'none';
+
+        osBadge.style.display = 'inline-flex';
+        osBadgeIcon.textContent = '🪟';
+        osBadgeText.textContent = 'Detected your device: Windows 10/11';
+
+        platformSwitch.innerHTML = 'Need NoteForge on your phone? <a id="toggleAlt">Show Android APK</a>';
+        if (navDownloadBtn) {
+          navDownloadBtn.href = winBtn.href;
+          navDownloadBtn.textContent = 'Download for Windows';
+        }
+      } else if (isIOS) {
+        currentPlatform = 'ios';
+        osBadge.style.display = 'inline-flex';
+        osBadgeIcon.textContent = '🍎';
+        osBadgeText.textContent = 'Detected your device: iOS (iPhone/iPad)';
+        platformSwitch.innerHTML = '<span style="color: var(--accent);">NoteForge is currently available for Android and Windows desktop.</span>';
+        apkBtn.style.display = 'inline-flex';
+        winBtn.style.display = 'inline-flex';
+        winBtn.className = 'btn btn-secondary';
+      } else {
+        // macOS or Linux desktop: show both clearly
+        apkBtn.style.display = 'inline-flex';
+        winBtn.style.display = 'inline-flex';
+        winBtn.className = 'btn btn-secondary';
+        if (isMac || isLinux) {
+          osBadge.style.display = 'inline-flex';
+          osBadgeIcon.textContent = isMac ? '🍎' : '🐧';
+          osBadgeText.textContent = isMac ? 'macOS (Showing Windows & Android packages)' : 'Linux (Showing Windows & Android packages)';
+        }
+      }
+
+      // Allow expanding alternative platform if requested
+      document.addEventListener('click', function(e) {
+        if (e.target && e.target.id === 'toggleAlt') {
+          e.preventDefault();
+          if (currentPlatform === 'android') {
+            winBtn.style.display = 'inline-flex';
+            winBtn.className = 'btn btn-secondary';
+            platformSwitch.innerHTML = '<span style="color: #ffbd2e;">⚠️ Note: Windows (.exe) files cannot run directly on Android phones.</span>';
+          } else if (currentPlatform === 'windows') {
+            apkBtn.style.display = 'inline-flex';
+            apkBtn.className = 'btn btn-secondary';
+            platformSwitch.innerHTML = '<span style="color: #ffbd2e;">⚠️ Note: Android (.apk) files cannot run natively on Windows PCs.</span>';
+          }
+        }
+      });
+
+      // Guard rails: prevent accidental wrong platform download
+      if (winBtn) {
+        winBtn.addEventListener('click', function(e) {
+          if (isAndroid) {
+            e.preventDefault();
+            alert('⚠️ Incompatible File Format\n\nYou are on an Android device.\nWindows (.exe / .zip) files can only run on Windows PCs, not Android phones.\n\nPlease tap "Download APK (Android)" instead.');
+          }
+        });
+      }
+
+      if (apkBtn) {
+        apkBtn.addEventListener('click', function(e) {
+          if (isWindows) {
+            const proceed = confirm('Notice: You are visiting from a Windows PC.\n\nThe .apk file is designed for Android phones and will not open directly on Windows.\n\nClick Cancel to download the Windows (.exe) application instead, or OK if you want to transfer this APK to your phone.');
+            if (!proceed) {
+              e.preventDefault();
+              window.location.href = winBtn.href;
+            }
+          }
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
 
