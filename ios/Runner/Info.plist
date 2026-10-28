@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Noteforge</string>
+	<string>NoteForge</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -66,5 +66,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- App Store Permissions & Descriptions -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>NoteForge uses Face ID / Touch ID to securely lock and protect your notes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>NoteForge needs access to your photo library to attach images to your notes.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>NoteForge needs access to your camera to capture and attach photos to your notes.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>NoteForge needs access to your microphone for audio recordings.</string>
 </dict>
 </plist>

@@ -1,0 +1,10 @@
+# Android Keystore configuration for Google Play release
+# Copy this file to key.properties and replace with your actual values:
+#
+# Generate a keystore with:
+# keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+storePassword=your_store_password
+keyPassword=your_key_password
+keyAlias=upload
+storeFile=upload-keystore.jks
