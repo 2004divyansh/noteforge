@@ -563,6 +563,12 @@
             <span class="btn-icon">🪟</span>
             <span>Download for Windows (.exe)</span>
           </a>
+
+          <!-- Linux .tar.gz Download Button -->
+          <a href="https://github.com/2004divyansh/noteforge/releases/latest/download/noteforge-linux-x64.tar.gz" class="btn btn-primary" id="linuxDownloadBtn">
+            <span class="btn-icon">🐧</span>
+            <span>Download for Linux (.tar.gz)</span>
+          </a>
         </div>
 
         <p class="platform-switch" id="platformSwitch"></p>
@@ -690,7 +696,7 @@ int binarySearch(List&lt;int&gt; arr, int target) {
           <div class="step-num">3</div>
           <div class="step-text">
             <h4>Direct Release Downloads</h4>
-            <p>Get the latest compiled packages for Android and Windows directly from our official <a href="https://github.com/2004divyansh/noteforge/releases/latest" target="_blank" style="color: var(--accent); text-decoration: underline;">GitHub Releases page</a>.</p>
+            <p>Get the latest compiled packages for Android, Windows, and Linux directly from our official <a href="https://github.com/2004divyansh/noteforge/releases/latest" target="_blank" style="color: var(--accent); text-decoration: underline;">GitHub Releases page</a>.</p>
           </div>
         </div>
       </div>
@@ -712,6 +718,7 @@ int binarySearch(List&lt;int&gt; arr, int target) {
 
       const apkBtn = document.getElementById('apkDownloadBtn');
       const winBtn = document.getElementById('winDownloadBtn');
+      const linuxBtn = document.getElementById('linuxDownloadBtn');
       const osBadge = document.getElementById('osBadge');
       const osBadgeIcon = document.getElementById('osBadgeIcon');
       const osBadgeText = document.getElementById('osBadgeText');
@@ -720,18 +727,36 @@ int binarySearch(List&lt;int&gt; arr, int target) {
 
       let currentPlatform = 'unknown';
 
-      if (isAndroid) {
+      if (isLinux) {
+        currentPlatform = 'linux';
+        // Linux visitors only see Linux package
+        linuxBtn.style.display = 'inline-flex';
+        linuxBtn.className = 'btn btn-primary';
+        winBtn.style.display = 'none';
+        apkBtn.style.display = 'none';
+
+        osBadge.style.display = 'inline-flex';
+        osBadgeIcon.textContent = '🐧';
+        osBadgeText.textContent = 'Detected your device: Linux (64-bit)';
+
+        platformSwitch.innerHTML = 'Need NoteForge on Windows or Android? <a id="toggleAlt">Show other platforms</a>';
+        if (navDownloadBtn) {
+          navDownloadBtn.href = linuxBtn.href;
+          navDownloadBtn.textContent = 'Download for Linux';
+        }
+      } else if (isAndroid) {
         currentPlatform = 'android';
         // Android visitors only see Android APK download
         apkBtn.style.display = 'inline-flex';
         apkBtn.className = 'btn btn-primary';
         winBtn.style.display = 'none';
+        linuxBtn.style.display = 'none';
 
         osBadge.style.display = 'inline-flex';
         osBadgeIcon.textContent = '📱';
         osBadgeText.textContent = 'Detected your device: Android (7.0+)';
 
-        platformSwitch.innerHTML = 'Need NoteForge on PC? <a id="toggleAlt">Show Windows download</a>';
+        platformSwitch.innerHTML = 'Need NoteForge on PC or Linux? <a id="toggleAlt">Show desktop downloads</a>';
         if (navDownloadBtn) {
           navDownloadBtn.href = apkBtn.href;
           navDownloadBtn.textContent = 'Download APK';
@@ -742,12 +767,13 @@ int binarySearch(List&lt;int&gt; arr, int target) {
         winBtn.style.display = 'inline-flex';
         winBtn.className = 'btn btn-primary';
         apkBtn.style.display = 'none';
+        linuxBtn.style.display = 'none';
 
         osBadge.style.display = 'inline-flex';
         osBadgeIcon.textContent = '🪟';
         osBadgeText.textContent = 'Detected your device: Windows 10/11';
 
-        platformSwitch.innerHTML = 'Need NoteForge on your phone? <a id="toggleAlt">Show Android APK</a>';
+        platformSwitch.innerHTML = 'Need NoteForge on your phone or Linux? <a id="toggleAlt">Show Android & Linux</a>';
         if (navDownloadBtn) {
           navDownloadBtn.href = winBtn.href;
           navDownloadBtn.textContent = 'Download for Windows';
@@ -757,19 +783,23 @@ int binarySearch(List&lt;int&gt; arr, int target) {
         osBadge.style.display = 'inline-flex';
         osBadgeIcon.textContent = '🍎';
         osBadgeText.textContent = 'Detected your device: iOS (iPhone/iPad)';
-        platformSwitch.innerHTML = '<span style="color: var(--accent);">NoteForge is currently available for Android and Windows desktop.</span>';
+        platformSwitch.innerHTML = '<span style="color: var(--accent);">NoteForge is currently available for Android, Windows, and Linux desktop.</span>';
         apkBtn.style.display = 'inline-flex';
         winBtn.style.display = 'inline-flex';
+        linuxBtn.style.display = 'inline-flex';
         winBtn.className = 'btn btn-secondary';
+        linuxBtn.className = 'btn btn-secondary';
       } else {
-        // macOS or Linux desktop: show both clearly
+        // macOS or generic desktop: show options clearly
         apkBtn.style.display = 'inline-flex';
         winBtn.style.display = 'inline-flex';
+        linuxBtn.style.display = 'inline-flex';
         winBtn.className = 'btn btn-secondary';
-        if (isMac || isLinux) {
+        linuxBtn.className = 'btn btn-secondary';
+        if (isMac) {
           osBadge.style.display = 'inline-flex';
-          osBadgeIcon.textContent = isMac ? '🍎' : '🐧';
-          osBadgeText.textContent = isMac ? 'macOS (Showing Windows & Android packages)' : 'Linux (Showing Windows & Android packages)';
+          osBadgeIcon.textContent = '🍎';
+          osBadgeText.textContent = 'macOS (Showing Windows, Linux & Android packages)';
         }
       }
 
@@ -777,15 +807,13 @@ int binarySearch(List&lt;int&gt; arr, int target) {
       document.addEventListener('click', function(e) {
         if (e.target && e.target.id === 'toggleAlt') {
           e.preventDefault();
-          if (currentPlatform === 'android') {
-            winBtn.style.display = 'inline-flex';
-            winBtn.className = 'btn btn-secondary';
-            platformSwitch.innerHTML = '<span style="color: #ffbd2e;">⚠️ Note: Windows (.exe) files cannot run directly on Android phones.</span>';
-          } else if (currentPlatform === 'windows') {
-            apkBtn.style.display = 'inline-flex';
-            apkBtn.className = 'btn btn-secondary';
-            platformSwitch.innerHTML = '<span style="color: #ffbd2e;">⚠️ Note: Android (.apk) files cannot run natively on Windows PCs.</span>';
-          }
+          apkBtn.style.display = 'inline-flex';
+          winBtn.style.display = 'inline-flex';
+          linuxBtn.style.display = 'inline-flex';
+          apkBtn.className = currentPlatform === 'android' ? 'btn btn-primary' : 'btn btn-secondary';
+          winBtn.className = currentPlatform === 'windows' ? 'btn btn-primary' : 'btn btn-secondary';
+          linuxBtn.className = currentPlatform === 'linux' ? 'btn btn-primary' : 'btn btn-secondary';
+          platformSwitch.innerHTML = '<span style="color: var(--text-muted);">Showing all available download formats.</span>';
         }
       });
 
@@ -794,18 +822,33 @@ int binarySearch(List&lt;int&gt; arr, int target) {
         winBtn.addEventListener('click', function(e) {
           if (isAndroid) {
             e.preventDefault();
-            alert('⚠️ Incompatible File Format\n\nYou are on an Android device.\nWindows (.exe / .zip) files can only run on Windows PCs, not Android phones.\n\nPlease tap "Download APK (Android)" instead.');
+            alert('⚠️ Incompatible File Format\n\nYou are visiting on an Android device.\nWindows (.exe / .zip) files can only run on Windows PCs, not Android phones.\n\nPlease tap "Download APK (Android)" instead.');
+          } else if (isLinux) {
+            e.preventDefault();
+            alert('⚠️ Incompatible File Format\n\nYou are on a Linux PC.\nWindows (.exe / .zip) files can only run on Windows, not Linux.\n\nPlease click "Download for Linux (.tar.gz)" instead.');
+          }
+        });
+      }
+
+      if (linuxBtn) {
+        linuxBtn.addEventListener('click', function(e) {
+          if (isAndroid) {
+            e.preventDefault();
+            alert('⚠️ Incompatible File Format\n\nYou are visiting on an Android device.\nLinux desktop packages (.tar.gz) cannot run on Android phones.\n\nPlease tap "Download APK (Android)" instead.');
+          } else if (isWindows) {
+            e.preventDefault();
+            alert('⚠️ Incompatible File Format\n\nYou are visiting from a Windows PC.\nLinux desktop packages (.tar.gz) are meant for Linux distributions (Ubuntu, Fedora, Debian, etc.).\n\nPlease click "Download for Windows (.exe)" instead.');
           }
         });
       }
 
       if (apkBtn) {
         apkBtn.addEventListener('click', function(e) {
-          if (isWindows) {
-            const proceed = confirm('Notice: You are visiting from a Windows PC.\n\nThe .apk file is designed for Android phones and will not open directly on Windows.\n\nClick Cancel to download the Windows (.exe) application instead, or OK if you want to transfer this APK to your phone.');
+          if (isWindows || isLinux) {
+            const proceed = confirm(`Notice: You are visiting from a ${isWindows ? 'Windows' : 'Linux'} desktop PC.\n\nThe .apk file is designed for Android phones and will not open directly on desktop OS.\n\nClick Cancel to download the ${isWindows ? 'Windows (.exe)' : 'Linux (.tar.gz)'} application instead, or OK if you want to transfer this APK to your phone.`);
             if (!proceed) {
               e.preventDefault();
-              window.location.href = winBtn.href;
+              window.location.href = isWindows ? winBtn.href : linuxBtn.href;
             }
           }
         });
