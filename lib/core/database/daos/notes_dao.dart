@@ -115,6 +115,20 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
+  // Unarchive note
+  Future<void> unarchiveNote(String id) {
+    return (update(notes)..where((n) => n.id.equals(id))).write(
+      const NotesCompanion(isArchived: Value(false)),
+    );
+  }
+
+  // Archive note
+  Future<void> archiveNote(String id) {
+    return (update(notes)..where((n) => n.id.equals(id))).write(
+      const NotesCompanion(isArchived: Value(true)),
+    );
+  }
+
   // Move note to folder
   Future<void> moveToFolder(String noteId, String? folderId) {
     return (update(notes)..where((n) => n.id.equals(noteId))).write(
