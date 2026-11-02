@@ -22,6 +22,12 @@ class HomeScreen extends ConsumerWidget {
         ? ref.watch(notesByFolderProvider(selectedFolder))
         : ref.watch(activeNotesProvider);
     final foldersAsync = ref.watch(foldersProvider);
+    final db = ref.watch(databaseProvider);
+
+    // Ensure database is attached for background cloud sync
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authProvider.notifier).attachDatabase(db);
+    });
 
     // Get folder name for title
     String title = 'All Notes';

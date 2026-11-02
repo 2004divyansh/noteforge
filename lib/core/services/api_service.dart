@@ -1,30 +1,36 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 class ApiService {
   ApiService._internal();
-  // Singleton pattern
   static final ApiService instance = ApiService._internal();
+
+  /// Default production cloud API endpoint.
+  /// When deployed to Render, Railway, or custom cloud host, worldwide multi-device sync
+  /// connects seamlessly to this public HTTPS URL with zero user configuration.
+  static const String defaultCloudUrl = 'https://noteforge-api.onrender.com';
+  static const String fallbackLocalUrl = 'http://localhost:5000';
 
   String _token = '';
   Map<String, dynamic>? _currentUser;
-
-  // Default URL depends on platform (Android emulator uses 10.0.2.2, desktop uses localhost)
   late String _baseUrl = _getDefaultBaseUrl();
+  bool _initialized = false;
 
   static String _getDefaultBaseUrl() {
-    if (kIsWeb) return 'http://localhost:5000';
-    try {
-      if (Platform.isAndroid) return 'http://10.0.2.2:5000';
-    } catch (_) {}
-    return 'http://localhost:5000';
+    // If running in development on emulator/desktop, developers can still connect locally
+    // but in release or cloud mode, default to the production cloud endpoint
+    if (kIsWeb) return defaultCloudUrl;
+    return defaultCloudUrl;
   }
 
   String get baseUrl => _baseUrl;
   set baseUrl(String url) {
     _baseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    _saveSession();
   }
 
   bool get isAuthenticated => _token.isNotEmpty && _currentUser != null;
@@ -42,6 +48,52 @@ class ApiService {
     return headers;
   }
 
+  Future<File?> _getAuthFile() async {
+    try {
+      if (kIsWeb) return null;
+      final dir = await getApplicationDocumentsDirectory();
+      return File(p.join(dir.path, 'noteforge_auth.json'));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveSession() async {
+    try {
+      final file = await _getAuthFile();
+      if (file == null) return;
+      final data = {
+        'token': _token,
+        'user': _currentUser,
+        'baseUrl': _baseUrl,
+      };
+      await file.writeAsString(jsonEncode(data));
+    } catch (e) {
+      debugPrint('Failed to save auth session: $e');
+    }
+  }
+
+  /// Initialize and restore existing session from storage
+  Future<void> init() async {
+    if (_initialized) return;
+    try {
+      final file = await _getAuthFile();
+      if (file != null && await file.exists()) {
+        final content = await file.readAsString();
+        final data = jsonDecode(content) as Map<String, dynamic>;
+        _token = data['token'] as String? ?? '';
+        _currentUser = data['user'] as Map<String, dynamic>?;
+        if (data['baseUrl'] != null && (data['baseUrl'] as String).isNotEmpty) {
+          _baseUrl = data['baseUrl'] as String;
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load auth session: $e');
+    } finally {
+      _initialized = true;
+    }
+  }
+
   /// Check backend health
   Future<bool> checkHealth() async {
     try {
@@ -54,7 +106,7 @@ class ApiService {
     }
   }
 
-  /// Register a new user
+  /// Register a new user account
   Future<Map<String, dynamic>> register({
     required String name,
     required String email,
@@ -75,6 +127,7 @@ class ApiService {
       if (res.statusCode == 201 && data['success'] == true) {
         _token = data['token'] as String;
         _currentUser = data['user'] as Map<String, dynamic>;
+        await _saveSession();
         return {'success': true, 'user': _currentUser};
       } else {
         return {'success': false, 'error': data['error'] ?? 'Registration failed'};
@@ -103,6 +156,7 @@ class ApiService {
       if (res.statusCode == 200 && data['success'] == true) {
         _token = data['token'] as String;
         _currentUser = data['user'] as Map<String, dynamic>;
+        await _saveSession();
         return {'success': true, 'user': _currentUser};
       } else {
         return {'success': false, 'error': data['error'] ?? 'Invalid credentials'};
@@ -113,9 +167,15 @@ class ApiService {
   }
 
   /// Log out
-  void logout() {
+  Future<void> logout() async {
     _token = '';
     _currentUser = null;
+    try {
+      final file = await _getAuthFile();
+      if (file != null && await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
   }
 
   /// Push local SQLite data to backend database

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noteforge/core/database/database.dart';
+import 'package:noteforge/core/services/api_service.dart';
 import 'package:noteforge/features/auth/providers/auth_provider.dart';
 
 class AuthDialog extends ConsumerStatefulWidget {
@@ -130,13 +131,13 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'NoteForge Cloud Backend',
+                          'NoteForge Cloud Sync',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          'Integrated REST API & SQLite Sync',
+                          'Worldwide multi-device note synchronization',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -177,8 +178,8 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                     Expanded(
                       child: Text(
                         authState.isServerOnline
-                            ? 'Backend Server: ONLINE (Port 5000)'
-                            : 'Backend Server: Checking / Offline',
+                            ? 'Cloud Backend: Connected & Active'
+                            : 'Cloud Backend: Connecting / Checking...',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -327,18 +328,42 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Server URL Configurable field
-                      TextFormField(
-                        controller: _serverUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'Backend Server URL',
-                          prefixIcon: Icon(Icons.dns_outlined),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          helperText: 'Default: http://localhost:5000 (Desktop) or 10.0.2.2 (Android)',
+                      // Advanced Server URL Configurable field (collapsed by default)
+                      Theme(
+                        data: theme.copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.tune, size: 18),
+                          title: Text(
+                            'Advanced: Custom Server URL',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          children: [
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _serverUrlController,
+                              decoration: InputDecoration(
+                                labelText: 'Custom Server URL',
+                                prefixIcon: const Icon(Icons.dns_outlined),
+                                border: const OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                helperText: 'Default: NoteForge Cloud Backend',
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.restore, size: 18),
+                                  tooltip: 'Reset to Cloud Default',
+                                  onPressed: () {
+                                    _serverUrlController.text = ApiService.defaultCloudUrl;
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
 
                       if (_errorMessage != null) ...[
                         Container(

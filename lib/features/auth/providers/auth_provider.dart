@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noteforge/core/database/database.dart';
@@ -52,10 +53,56 @@ class AuthNotifier extends StateNotifier<AuthState> {
       : super(AuthState(
           serverUrl: ApiService.instance.baseUrl,
         )) {
-    checkServerHealth();
+    _initSession();
   }
 
   final ApiService _api = ApiService.instance;
+  Timer? _autoSyncTimer;
+  AppDatabase? _db;
+
+  Future<void> _initSession() async {
+    await _api.init();
+    if (_api.isAuthenticated && _api.currentUser != null) {
+      state = state.copyWith(
+        isAuthenticated: true,
+        userName: _api.currentUser!['name'] as String?,
+        userEmail: _api.currentUser!['email'] as String?,
+        serverUrl: _api.baseUrl,
+        isServerOnline: true,
+        statusMessage: 'Cloud sync active.',
+      );
+      if (_db != null) {
+        syncWithBackend(_db!, silent: true);
+        _startAutoSync();
+      }
+    }
+    checkServerHealth();
+  }
+
+  /// Attach active database instance for automatic background sync
+  void attachDatabase(AppDatabase db) {
+    _db = db;
+    if (state.isAuthenticated) {
+      syncWithBackend(db, silent: true);
+      _startAutoSync();
+    }
+  }
+
+  void _startAutoSync() {
+    _autoSyncTimer?.cancel();
+    // Silent periodic background sync every 30 seconds
+    _autoSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (state.isAuthenticated && _db != null && !state.isSyncing) {
+        syncWithBackend(_db!, silent: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoSyncTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> checkServerHealth() async {
     final online = await _api.checkHealth();
@@ -85,6 +132,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isServerOnline: true,
         statusMessage: 'Registered and connected to NoteForge backend!',
       );
+      _startAutoSync();
       return true;
     } else {
       state = state.copyWith(
@@ -110,6 +158,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isServerOnline: true,
         statusMessage: 'Logged in successfully. Cloud sync ready.',
       );
+      _startAutoSync();
       return true;
     } else {
       state = state.copyWith(
@@ -119,8 +168,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void logout() {
-    _api.logout();
+  Future<void> logout() async {
+    _autoSyncTimer?.cancel();
+    await _api.logout();
     state = state.copyWith(
       isAuthenticated: false,
       userName: null,
@@ -130,13 +180,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Two-way sync with the backend database
-  Future<bool> syncWithBackend(AppDatabase db) async {
+  Future<bool> syncWithBackend(AppDatabase db, {bool silent = false}) async {
     if (!state.isAuthenticated) {
-      state = state.copyWith(statusMessage: 'Please log in to sync with cloud backend.');
+      if (!silent) {
+        state = state.copyWith(statusMessage: 'Please log in to sync with cloud backend.');
+      }
       return false;
     }
 
-    state = state.copyWith(isSyncing: true, statusMessage: 'Syncing notes with backend...');
+    state = state.copyWith(
+      isSyncing: true,
+      statusMessage: silent ? state.statusMessage : 'Syncing notes with backend...',
+    );
 
     try {
       // 1. Gather all local notes, folders, and tags from Drift
@@ -265,7 +320,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isSyncing: false,
         lastSyncTime: timeStr,
-        statusMessage: 'Sync complete! Cloud database updated at $timeStr.',
+        statusMessage: 'Cloud sync complete at $timeStr.',
       );
       return true;
     } catch (e) {
