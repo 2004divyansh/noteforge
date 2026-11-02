@@ -23,6 +23,7 @@ dependencies:
   pdf: ^3.11.2
   printing: ^5.13.5
   local_auth: any
+  crypto: ^3.0.3
   flex_color_scheme: ^8.1.1
   flutter_animate: ^4.5.2
   file_picker: ^8.1.7

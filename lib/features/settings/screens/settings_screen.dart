@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noteforge/core/constants/app_constants.dart';
-import 'package:noteforge/features/settings/providers/settings_provider.dart';
-import 'package:noteforge/features/export/services/export_service.dart';
-import 'package:noteforge/features/export/services/import_service.dart';
+import 'package:noteforge/core/database/database.dart';
 import 'package:noteforge/features/auth/providers/auth_provider.dart';
 import 'package:noteforge/features/auth/screens/auth_dialog.dart';
-import 'package:noteforge/core/database/database.dart';
+import 'package:noteforge/features/export/services/export_service.dart';
+import 'package:noteforge/features/export/services/import_service.dart';
+import 'package:noteforge/features/security/providers/security_provider.dart';
+import 'package:noteforge/features/security/widgets/app_lock_setup_dialog.dart';
+import 'package:noteforge/features/settings/providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final themeMode = ref.watch(themeModeProvider);
-    final appLockEnabled = ref.watch(appLockEnabledProvider);
+    final securityState = ref.watch(securityProvider);
     final authState = ref.watch(authProvider);
     final db = ref.watch(databaseProvider);
 
@@ -96,13 +99,39 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
           // Security section
           const _SectionHeader(title: 'Security'),
-          SwitchListTile(
-            secondary: const Icon(Icons.fingerprint),
-            title: const Text('App Lock'),
-            subtitle: const Text('Require biometric or PIN to open'),
-            value: appLockEnabled,
-            onChanged: (value) {
-              ref.read(appLockEnabledProvider.notifier).toggleLock(value);
+          ListTile(
+            leading: Icon(
+              Icons.fingerprint,
+              color: securityState.isLockEnabled ? theme.colorScheme.primary : null,
+              size: 28,
+            ),
+            title: const Text(
+              'App Lock',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              securityState.isLockEnabled
+                  ? (securityState.useBiometrics && securityState.isBiometricsSupported
+                      ? 'Protected with PIN & Biometrics (Windows Hello / Fingerprint)'
+                      : 'Protected with PIN Lock')
+                  : 'Require biometric or PIN to open app',
+            ),
+            trailing: Switch(
+              value: securityState.isLockEnabled,
+              onChanged: (val) {
+                if (val) {
+                  AppLockSetupDialog.show(context);
+                } else {
+                  AppLockManageDialog.show(context);
+                }
+              },
+            ),
+            onTap: () {
+              if (securityState.isLockEnabled) {
+                AppLockManageDialog.show(context);
+              } else {
+                AppLockSetupDialog.show(context);
+              }
             },
           ),
           const Divider(),
