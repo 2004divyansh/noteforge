@@ -11,6 +11,25 @@ router.post('/push', (req, res) => {
     const userId = req.user.id;
     const { folders = [], tags = [], notes = [], noteTags = [] } = req.body;
 
+    // Explicitly guarantee user row exists in SQLite before transaction (prevents foreign key errors on container redeploys)
+    const existingUser = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+    if (!existingUser) {
+      try {
+        db.prepare(`
+          INSERT OR IGNORE INTO users (id, name, email, password_hash, created_at)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          userId,
+          req.user.name || 'NoteForge User',
+          req.user.email || `${userId}@noteforge.cloud`,
+          'ephemeral_session_restored',
+          new Date().toISOString()
+        );
+      } catch (insertUserErr) {
+        console.error('Failed to ensure user row:', insertUserErr);
+      }
+    }
+
     // Use transaction for atomic consistency
     db.exec('BEGIN TRANSACTION;');
 
@@ -21,7 +40,15 @@ router.post('/push', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
       for (const f of folders) {
-        folderStmt.run(f.id, userId, f.name, f.color || 4288585374, f.parentId || null, f.createdAt || new Date().toISOString(), f.updatedAt || new Date().toISOString());
+        folderStmt.run(
+          f.id,
+          userId,
+          f.name,
+          f.color || 4288585374,
+          f.parentId || null,
+          f.createdAt || new Date().toISOString(),
+          f.updatedAt || new Date().toISOString()
+        );
       }
 
       // 2. Sync Tags
@@ -85,7 +112,7 @@ router.post('/push', (req, res) => {
     }
   } catch (err) {
     console.error('Sync push error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to push sync data.' });
+    return res.status(500).json({ success: false, error: 'Failed to push sync data: ' + err.message });
   }
 });
 
@@ -94,6 +121,25 @@ router.get('/pull', (req, res) => {
   try {
     const userId = req.user.id;
 
+    // Ensure user row exists
+    const existingUser = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+    if (!existingUser) {
+      try {
+        db.prepare(`
+          INSERT OR IGNORE INTO users (id, name, email, password_hash, created_at)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          userId,
+          req.user.name || 'NoteForge User',
+          req.user.email || `${userId}@noteforge.cloud`,
+          'ephemeral_session_restored',
+          new Date().toISOString()
+        );
+      } catch (insertUserErr) {
+        console.error('Failed to ensure user row:', insertUserErr);
+      }
+    }
+
     const folders = db.prepare('SELECT * FROM folders WHERE user_id = ?').all(userId);
     const tags = db.prepare('SELECT * FROM tags WHERE user_id = ?').all(userId);
     const notes = db.prepare('SELECT * FROM notes WHERE user_id = ?').all(userId);
@@ -101,19 +147,24 @@ router.get('/pull', (req, res) => {
 
     return res.json({
       success: true,
-      timestamp: new Date().toISOString(),
       data: {
         folders,
         tags,
         notes,
         noteTags
-      }
+      },
+      count: {
+        folders: folders.length,
+        tags: tags.length,
+        notes: notes.length,
+        noteTags: noteTags.length
+      },
+      timestamp: new Date().toISOString()
     });
   } catch (err) {
     console.error('Sync pull error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to pull sync data.' });
+    return res.status(500).json({ success: false, error: 'Failed to pull sync data: ' + err.message });
   }
 });
 
 module.exports = router;
-
