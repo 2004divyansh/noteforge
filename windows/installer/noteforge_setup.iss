@@ -40,6 +40,12 @@ Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ign
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{userdocs}\NoteForge"
+Type: files; Name: "{userdocs}\noteforge_auth.json"
+Type: filesandordirs; Name: "{userappdata}\NoteForge"
+Type: filesandordirs; Name: "{localappdata}\NoteForge"
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 

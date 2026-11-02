@@ -55,8 +55,9 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier()
-      : super(AuthState(
+  AuthNotifier({AppDatabase? db})
+      : _db = db,
+        super(AuthState(
           serverUrl: ApiService.instance.baseUrl,
         )) {
     _initSession();
@@ -169,6 +170,59 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> loginWithGoogle({
+    required String email,
+    required String name,
+    String? googleId,
+  }) async {
+    state = state.copyWith(statusMessage: 'Signing in with Google...');
+    final result = await _api.loginWithGoogle(email: email, name: name, googleId: googleId);
+
+    if (result['success'] == true) {
+      final user = result['user'] as Map<String, dynamic>;
+      state = state.copyWith(
+        isAuthenticated: true,
+        userName: user['name'] as String?,
+        userEmail: user['email'] as String?,
+        isServerOnline: true,
+        statusMessage: 'Signed in with Google!',
+      );
+      _startAutoSync();
+      return true;
+    } else {
+      state = state.copyWith(
+        statusMessage: result['error']?.toString() ?? 'Google sign in failed.',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> resetPassword({
+    required String email,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(statusMessage: 'Resetting password...');
+    final result = await _api.resetPassword(email: email, newPassword: newPassword);
+
+    if (result['success'] == true) {
+      final user = result['user'] as Map<String, dynamic>;
+      state = state.copyWith(
+        isAuthenticated: true,
+        userName: user['name'] as String?,
+        userEmail: user['email'] as String?,
+        isServerOnline: true,
+        statusMessage: 'Password reset successfully!',
+      );
+      _startAutoSync();
+      return true;
+    } else {
+      state = state.copyWith(
+        statusMessage: result['error']?.toString() ?? 'Password reset failed.',
+      );
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     _autoSyncTimer?.cancel();
     await _api.logout();
@@ -184,6 +238,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('Error clearing local database on logout: $e');
       }
     }
+
+    try {
+      final oldDeletions = await DeletionTracker.getDeletedNoteIds();
+      await DeletionTracker.clearDeletedNoteIds(oldDeletions);
+    } catch (_) {}
 
     state = state.copyWith(
       isAuthenticated: false,
@@ -264,14 +323,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // Clear successfully synced deletions
         await DeletionTracker.clearDeletedNoteIds(deletedNoteIds);
       } else {
-        state = state.copyWith(
-          statusMessage: pushResult['error']?.toString() ?? 'Sync push failed',
-        );
+        if (pushResult['status'] == 401) {
+          await logout();
+          state = state.copyWith(statusMessage: 'Session expired. Please sign in again.');
+        } else {
+          state = state.copyWith(
+            statusMessage: pushResult['error']?.toString() ?? 'Sync push failed',
+          );
+        }
         return false;
       }
 
       // 2. Pull remote changes from backend
       final pullResult = await _api.pullSync();
+      if (pullResult['status'] == 401) {
+        await logout();
+        state = state.copyWith(statusMessage: 'Session expired. Please sign in again.');
+        return false;
+      }
       if (pullResult['success'] == true && pullResult['data'] != null) {
         final data = pullResult['data'] as Map<String, dynamic>;
         final remoteNotes = data['notes'] as List<dynamic>? ?? [];
@@ -379,7 +448,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final db = ref.watch(databaseProvider);
-  final notifier = AuthNotifier();
-  notifier.setDatabase(db);
+  final notifier = AuthNotifier(db: db);
   return notifier;
 });

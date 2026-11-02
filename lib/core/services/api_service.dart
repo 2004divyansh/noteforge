@@ -171,6 +171,66 @@ class ApiService {
     }
   }
 
+  /// Sign in or register using Google Account
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String email,
+    required String name,
+    String? googleId,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$_baseUrl/api/auth/google'),
+        headers: _headers(withAuth: false),
+        body: jsonEncode({
+          'email': email,
+          'name': name,
+          'googleId': googleId,
+        }),
+      );
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200 && data['token'] != null) {
+        _token = data['token'] as String;
+        _currentUser = data['user'] as Map<String, dynamic>;
+        await _saveSession();
+        return {'success': true, 'user': _currentUser, 'token': _token};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Google sign in failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Cannot connect to backend server: $e'};
+    }
+  }
+
+  /// Reset user password
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String newPassword,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$_baseUrl/api/auth/reset-password'),
+        headers: _headers(withAuth: false),
+        body: jsonEncode({
+          'email': email,
+          'newPassword': newPassword,
+        }),
+      );
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200 && data['token'] != null) {
+        _token = data['token'] as String;
+        _currentUser = data['user'] as Map<String, dynamic>;
+        await _saveSession();
+        return {'success': true, 'user': _currentUser, 'token': _token};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Password reset failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Cannot connect to backend server: $e'};
+    }
+  }
+
   /// Log out
   Future<void> logout() async {
     _token = '';
@@ -208,6 +268,10 @@ class ApiService {
         }),
       );
 
+      if (res.statusCode == 401) {
+        return {'success': false, 'status': 401, 'error': 'Session expired. Please log in again.'};
+      }
+
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       return data;
     } catch (e) {
@@ -226,6 +290,10 @@ class ApiService {
         Uri.parse('$_baseUrl/api/sync/pull'),
         headers: _headers(),
       );
+
+      if (res.statusCode == 401) {
+        return {'success': false, 'status': 401, 'error': 'Session expired. Please log in again.'};
+      }
 
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       return data;

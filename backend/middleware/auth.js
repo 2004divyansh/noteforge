@@ -17,27 +17,15 @@ function authenticateToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Auto-heal / ensure user row exists in database (prevents foreign key errors on container redeploys)
     if (decoded && decoded.id) {
-      let user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(decoded.id);
+      const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(decoded.id);
       if (!user) {
-        try {
-          db.prepare(`
-            INSERT OR IGNORE INTO users (id, name, email, password_hash, created_at)
-            VALUES (?, ?, ?, ?, ?)
-          `).run(
-            decoded.id,
-            decoded.name || 'NoteForge User',
-            decoded.email || `${decoded.id}@noteforge.cloud`,
-            'ephemeral_session_restored',
-            new Date().toISOString()
-          );
-          user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(decoded.id);
-        } catch (healErr) {
-          console.error('Error auto-healing user row:', healErr);
-        }
+        return res.status(401).json({
+          success: false,
+          error: 'Session expired or database was reset. Please log in again.'
+        });
       }
-      req.user = user || decoded;
+      req.user = user;
     } else {
       req.user = decoded;
     }

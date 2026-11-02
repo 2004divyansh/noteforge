@@ -19,6 +19,7 @@ class AuthDialog extends ConsumerStatefulWidget {
 
 class _AuthDialogState extends ConsumerState<AuthDialog> {
   bool _isRegister = false;
+  bool _isResetPassword = false;
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
@@ -47,7 +48,12 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
     final authNotifier = ref.read(authProvider.notifier);
 
     bool success;
-    if (_isRegister) {
+    if (_isResetPassword) {
+      success = await authNotifier.resetPassword(
+        email: _emailController.text.trim(),
+        newPassword: _passwordController.text,
+      );
+    } else if (_isRegister) {
       success = await authNotifier.register(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
@@ -76,7 +82,114 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isRegister ? 'Account created! Notes synced.' : 'Signed in! Notes synced.'),
+            content: Text(
+              _isResetPassword
+                  ? 'Password reset successfully! Notes synced.'
+                  : (_isRegister ? 'Account created! Notes synced.' : 'Signed in! Notes synced.'),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    final googleEmailController = TextEditingController(text: _emailController.text.trim());
+    final googleNameController = TextEditingController(text: _nameController.text.trim());
+
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            GoogleLogoIcon(size: 22),
+            SizedBox(width: 10),
+            Text('Sign in with Google', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter your Google account email to sign in or connect with NoteForge:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: googleEmailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Google Email',
+                prefixIcon: Icon(Icons.email_outlined),
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: googleNameController,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Display Name (optional)',
+                prefixIcon: Icon(Icons.person_outline),
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              if (googleEmailController.text.contains('@')) {
+                Navigator.pop(ctx, true);
+              }
+            },
+            icon: const Icon(Icons.check, size: 18),
+            label: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed != true || !mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final email = googleEmailController.text.trim();
+    final name = googleNameController.text.trim().isNotEmpty
+        ? googleNameController.text.trim()
+        : email.split('@')[0];
+
+    final authNotifier = ref.read(authProvider.notifier);
+    final success = await authNotifier.loginWithGoogle(email: email, name: name);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (!success) {
+          _errorMessage = ref.read(authProvider).statusMessage ?? 'Google authentication failed.';
+        }
+      });
+
+      if (success) {
+        final db = ref.read(databaseProvider);
+        authNotifier.syncWithBackend(db);
+
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Signed in as $email! Notes synced.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -111,7 +224,9 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                     child: Icon(
                       authState.isAuthenticated
                           ? Icons.account_circle
-                          : (_isRegister ? Icons.person_add_alt_1 : Icons.lock_outline),
+                          : (_isResetPassword
+                              ? Icons.lock_reset
+                              : (_isRegister ? Icons.person_add_alt_1 : Icons.lock_outline)),
                       color: theme.colorScheme.primary,
                       size: 26,
                     ),
@@ -124,7 +239,9 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                         Text(
                           authState.isAuthenticated
                               ? 'My Account'
-                              : (_isRegister ? 'Create Account' : 'Sign In'),
+                              : (_isResetPassword
+                                  ? 'Reset Password'
+                                  : (_isRegister ? 'Create Account' : 'Sign In')),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -132,9 +249,11 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                         Text(
                           authState.isAuthenticated
                               ? 'Manage your NoteForge account'
-                              : (_isRegister
-                                  ? 'Sync your notes across all your devices'
-                                  : 'Sign in to access your notes'),
+                              : (_isResetPassword
+                                  ? 'Choose a new password for your account'
+                                  : (_isRegister
+                                      ? 'Sync notes across all your devices'
+                                      : 'Sign in to access your notes')),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -225,13 +344,48 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                   ),
                 ),
               ] else ...[
-                // Auth Form (Login or Register)
+                // Google OAuth Button
+                OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _handleGoogleSignIn,
+                  icon: const GoogleLogoIcon(size: 20),
+                  label: const Text(
+                    'Continue with Google',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Divider OR
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.outline,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Auth Form (Login, Register, or Reset Password)
                 Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (_isRegister) ...[
+                      if (_isRegister && !_isResetPassword) ...[
                         TextFormField(
                           controller: _nameController,
                           textCapitalization: TextCapitalization.words,
@@ -262,16 +416,36 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                       TextFormField(
                         controller: _passwordController,
                         obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: InputDecoration(
+                          labelText: _isResetPassword ? 'New Password' : 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         ),
                         validator: (val) =>
                             val == null || val.length < 6 ? 'Password must be at least 6 characters' : null,
                       ),
-                      const SizedBox(height: 16),
+
+                      if (!_isRegister && !_isResetPassword) ...[
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _isResetPassword = true;
+                                _errorMessage = null;
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.only(top: 4, bottom: 4),
+                            ),
+                            child: const Text('Forgot password?', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 16),
+                      ],
 
                       if (_errorMessage != null) ...[
                         Container(
@@ -301,25 +475,39 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
                             : Text(
-                                _isRegister ? 'Create Account' : 'Sign In',
+                                _isResetPassword
+                                    ? 'Reset Password & Sign In'
+                                    : (_isRegister ? 'Create Account' : 'Sign In'),
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                               ),
                       ),
                       const SizedBox(height: 12),
 
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _isRegister = !_isRegister;
-                            _errorMessage = null;
-                          });
-                        },
-                        child: Text(
-                          _isRegister
-                              ? 'Already have an account? Sign In'
-                              : 'Need an account? Register',
+                      if (_isResetPassword) ...[
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isResetPassword = false;
+                              _errorMessage = null;
+                            });
+                          },
+                          child: const Text('Back to Sign In'),
                         ),
-                      ),
+                      ] else ...[
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isRegister = !_isRegister;
+                              _errorMessage = null;
+                            });
+                          },
+                          child: Text(
+                            _isRegister
+                                ? 'Already have an account? Sign In'
+                                : 'Need an account? Register',
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -330,4 +518,62 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
       ),
     );
   }
+}
+
+class GoogleLogoIcon extends StatelessWidget {
+  const GoogleLogoIcon({super.key, this.size = 20});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _GoogleLogoPainter(),
+    );
+  }
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double s = size.width;
+    final center = Offset(s / 2, s / 2);
+    final radius = s * 0.44;
+    final strokeWidth = s * 0.19;
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt;
+
+    final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+
+    // Red (top)
+    paint.color = const Color(0xFFEA4335);
+    canvas.drawArc(rect, -2.4, 1.35, false, paint);
+
+    // Yellow (left)
+    paint.color = const Color(0xFFFBBC05);
+    canvas.drawArc(rect, -1.05, 1.15, false, paint);
+
+    // Green (bottom)
+    paint.color = const Color(0xFF34A853);
+    canvas.drawArc(rect, 0.1, 1.35, false, paint);
+
+    // Blue (right)
+    paint.color = const Color(0xFF4285F4);
+    canvas.drawArc(rect, 1.45, 0.95, false, paint);
+
+    // Blue horizontal crossbar
+    final barPaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+      Rect.fromLTRB(s * 0.46, s * 0.41, s * 0.92, s * 0.59),
+      barPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

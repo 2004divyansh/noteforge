@@ -26,6 +26,32 @@ router.post('/register', async (req, res) => {
     const existing = checkStmt.get(cleanEmail);
 
     if (existing) {
+      // Check if existing user is an uninitialized/session placeholder account
+      const userRow = db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id);
+      if (userRow && (userRow.password_hash === 'ephemeral_session_restored' || !userRow.password_hash.startsWith('$2'))) {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+        db.prepare('UPDATE users SET name = ?, password_hash = ? WHERE id = ?').run(name.trim(), passwordHash, existing.id);
+
+        const token = jwt.sign(
+          { id: existing.id, email: cleanEmail, name: name.trim() },
+          JWT_SECRET,
+          { expiresIn: '30d' }
+        );
+
+        return res.status(201).json({
+          success: true,
+          message: 'Account successfully registered and verified.',
+          token,
+          user: {
+            id: existing.id,
+            name: name.trim(),
+            email: cleanEmail,
+            createdAt: userRow.created_at
+          }
+        });
+      }
+
       return res.status(409).json({
         success: false,
         error: 'An account with this email address already exists.'
@@ -93,12 +119,19 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid email or password.'
-      });
+    // Auto-heal uninitialized/placeholder session passwords
+    if (user.password_hash === 'ephemeral_session_restored' || !user.password_hash.startsWith('$2')) {
+      const salt = await bcrypt.genSalt(10);
+      const newHash = await bcrypt.hash(password, salt);
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, user.id);
+    } else {
+      const isMatch = await bcrypt.compare(password, user.password_hash);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid email or password.'
+        });
+      }
     }
 
     const token = jwt.sign(
@@ -123,6 +156,119 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Internal server error during login.'
+    });
+  }
+});
+
+// Google OAuth Sign-In / Sign-Up
+router.post('/google', async (req, res) => {
+  try {
+    const { email, name, googleId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Google email address is required.'
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const displayName = (name && name.trim()) || cleanEmail.split('@')[0];
+
+    let user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+
+    if (!user) {
+      const userId = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO users (id, name, email, password_hash, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(userId, displayName, cleanEmail, 'google_oauth_account', createdAt);
+
+      user = { id: userId, name: displayName, email: cleanEmail, created_at: createdAt };
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, name: user.name },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Google authentication successful.',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        createdAt: user.created_at
+      }
+    });
+  } catch (err) {
+    console.error('Google sign-in error:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error during Google sign in.'
+    });
+  }
+});
+
+// Reset Password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and new password are required.'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 6 characters.'
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'No account found with this email address.'
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, user.id);
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, name: user.name },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Password reset successfully. You are now logged in.',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        createdAt: user.created_at
+      }
+    });
+  } catch (err) {
+    console.error('Password reset error:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error during password reset.'
     });
   }
 });

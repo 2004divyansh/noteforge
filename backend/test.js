@@ -73,6 +73,32 @@ async function runTests() {
     );
     assert(login.status === 200 && login.data.token, 'User Login & Authentication');
 
+    // 3a. Google OAuth Sign In
+    const googleAuth = await request(
+      {
+        host: '127.0.0.1',
+        port: 5000,
+        path: '/api/auth/google',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      },
+      { email: `google_${Date.now()}@gmail.com`, name: 'Google User' }
+    );
+    assert(googleAuth.status === 200 && googleAuth.data.token, 'Google OAuth Sign In & Auto-Registration');
+
+    // 3b. Reset Password
+    const reset = await request(
+      {
+        host: '127.0.0.1',
+        port: 5000,
+        path: '/api/auth/reset-password',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      },
+      { email: testEmail, newPassword: 'newpassword456' }
+    );
+    assert(reset.status === 200 && reset.data.token, 'Password Reset Endpoint');
+
     // 4. Create Note via API
     const note = await request(
       {
