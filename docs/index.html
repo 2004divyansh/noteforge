@@ -767,10 +767,10 @@
             <span>Download APK (Android)</span>
           </a>
 
-          <!-- Windows .exe Download Button -->
-          <a href="https://github.com/2004divyansh/noteforge/releases/latest/download/noteforge-windows.zip" class="btn btn-primary" id="winDownloadBtn">
+          <!-- Windows .exe Setup Installer Download Button -->
+          <a href="https://github.com/2004divyansh/noteforge/releases/latest/download/NoteForge-Setup.exe" class="btn btn-primary" id="winDownloadBtn">
             <span class="btn-icon">🪟</span>
-            <span>Download for Windows (.exe)</span>
+            <span>Download for Windows (.exe Installer)</span>
           </a>
 
           <!-- Linux .tar.gz Download Button -->
@@ -1054,10 +1054,10 @@ int binarySearch(List&lt;int&gt; arr, int target) {
         winBtn.addEventListener('click', function(e) {
           if (isAndroid) {
             e.preventDefault();
-            alert('⚠️ Incompatible File Format\n\nYou are visiting on an Android device.\nWindows (.exe / .zip) files can only run on Windows PCs, not Android phones.\n\nPlease tap "Download APK (Android)" instead.');
+            alert('⚠️ Incompatible File Format\n\nYou are visiting on an Android device.\nWindows (.exe installer) files can only run on Windows PCs, not Android phones.\n\nPlease tap "Download APK (Android)" instead.');
           } else if (isLinux) {
             e.preventDefault();
-            alert('⚠️ Incompatible File Format\n\nYou are on a Linux PC.\nWindows (.exe / .zip) files can only run on Windows, not Linux.\n\nPlease click "Download for Linux (.tar.gz)" instead.');
+            alert('⚠️ Incompatible File Format\n\nYou are on a Linux PC.\nWindows (.exe installer) files can only run on Windows, not Linux.\n\nPlease click "Download for Linux (.tar.gz)" instead.');
           }
         });
       }
