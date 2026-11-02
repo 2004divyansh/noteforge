@@ -7,6 +7,9 @@ import 'package:noteforge/features/home/widgets/app_drawer.dart';
 import 'package:noteforge/features/notes/providers/notes_provider.dart';
 import 'package:noteforge/features/settings/providers/settings_provider.dart';
 import 'package:noteforge/features/folders/providers/folders_provider.dart';
+import 'package:noteforge/features/auth/providers/auth_provider.dart';
+import 'package:noteforge/features/auth/screens/auth_dialog.dart';
+import 'package:noteforge/core/database/database.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -33,6 +36,38 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          Consumer(
+            builder: (context, ref, child) {
+              final authState = ref.watch(authProvider);
+              final db = ref.watch(databaseProvider);
+              return IconButton(
+                icon: authState.isSyncing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        authState.isAuthenticated
+                            ? Icons.cloud_done_rounded
+                            : Icons.cloud_sync_outlined,
+                        color: authState.isAuthenticated
+                            ? Colors.green
+                            : null,
+                      ),
+                tooltip: authState.isAuthenticated
+                    ? 'Sync with Backend (${authState.userEmail})'
+                    : 'Connect to Backend / Cloud Sync',
+                onPressed: () {
+                  if (authState.isAuthenticated) {
+                    ref.read(authProvider.notifier).syncWithBackend(db);
+                  } else {
+                    AuthDialog.show(context);
+                  }
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () => Navigator.pushNamed(context, AppRouter.search),

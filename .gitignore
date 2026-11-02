@@ -55,3 +55,10 @@ key.properties
 
 # Local cache
 .cache/
+
+# Backend node modules and local sqlite database
+backend/node_modules/
+backend/*.sqlite
+backend/*.sqlite-wal
+backend/*.sqlite-shm
+backend/.env

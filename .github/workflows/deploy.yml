@@ -42,6 +42,12 @@ jobs:
       - name: Run Tests
         run: flutter test
 
+      - name: Test Integrated Backend API
+        run: |
+          cd backend
+          npm install
+          npm test
+
   build-android-apk:
     name: Build Android APK
     needs: test

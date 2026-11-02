@@ -4,6 +4,9 @@ import 'package:noteforge/core/constants/app_constants.dart';
 import 'package:noteforge/features/settings/providers/settings_provider.dart';
 import 'package:noteforge/features/export/services/export_service.dart';
 import 'package:noteforge/features/export/services/import_service.dart';
+import 'package:noteforge/features/auth/providers/auth_provider.dart';
+import 'package:noteforge/features/auth/screens/auth_dialog.dart';
+import 'package:noteforge/core/database/database.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -12,6 +15,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final appLockEnabled = ref.watch(appLockEnabledProvider);
+    final authState = ref.watch(authProvider);
+    final db = ref.watch(databaseProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -19,6 +24,71 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: ListView(
         children: [
+          // Backend & Cloud Sync Section (CPAD Requirement)
+          const _SectionHeader(title: 'Integrated Backend & Cloud Sync'),
+          ListTile(
+            leading: Icon(
+              Icons.cloud_done_rounded,
+              color: authState.isServerOnline ? Colors.green : Colors.orange,
+            ),
+            title: Text(
+              authState.isAuthenticated
+                  ? 'Account: ${authState.userName}'
+                  : 'Backend Server Connection',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              authState.isAuthenticated
+                  ? '${authState.userEmail} • ${authState.serverUrl}'
+                  : 'Status: ${authState.isServerOnline ? 'Server Online' : 'Offline'} • Click to connect',
+            ),
+            trailing: Chip(
+              label: Text(
+                authState.isAuthenticated ? 'Logged In' : 'Local Mode',
+                style: const TextStyle(fontSize: 11),
+              ),
+              backgroundColor: authState.isAuthenticated
+                  ? Colors.green.withValues(alpha: 0.15)
+                  : Colors.grey.withValues(alpha: 0.15),
+            ),
+            onTap: () => AuthDialog.show(context),
+          ),
+          if (authState.isAuthenticated)
+            ListTile(
+              leading: authState.isSyncing
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync),
+              title: const Text('Sync Notes with Cloud'),
+              subtitle: Text(
+                authState.lastSyncTime != null
+                    ? 'Last synced at ${authState.lastSyncTime}'
+                    : 'Tap to push & pull latest changes',
+              ),
+              onTap: authState.isSyncing
+                  ? null
+                  : () async {
+                      final success = await ref
+                          .read(authProvider.notifier)
+                          .syncWithBackend(db);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              ref.read(authProvider).statusMessage ??
+                                  (success ? 'Sync complete!' : 'Sync failed'),
+                            ),
+                            backgroundColor: success ? Colors.green : Colors.red,
+                          ),
+                        );
+                      }
+                    },
+            ),
+          const Divider(),
+
           // Appearance section
           const _SectionHeader(title: 'Appearance'),
           ListTile(

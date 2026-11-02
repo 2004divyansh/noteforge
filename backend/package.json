@@ -1,0 +1,21 @@
+{
+  "name": "noteforge-backend",
+  "version": "1.0.0",
+  "description": "Integrated REST API and SQLite Database Backend for NoteForge Cross-Platform Application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test.js"
+  },
+  "keywords": ["noteforge", "flutter", "backend", "api", "sqlite", "cpad"],
+  "author": "Divyansh",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
