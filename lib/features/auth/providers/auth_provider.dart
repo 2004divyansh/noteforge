@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noteforge/core/database/database.dart';
 import 'package:noteforge/core/services/api_service.dart';
@@ -7,6 +8,7 @@ import 'package:noteforge/core/services/api_service.dart';
 class AuthState {
   const AuthState({
     this.isAuthenticated = false,
+    this.isInitialized = false,
     this.userName,
     this.userEmail,
     required this.serverUrl,
@@ -17,6 +19,7 @@ class AuthState {
   });
 
   final bool isAuthenticated;
+  final bool isInitialized;
   final String? userName;
   final String? userEmail;
   final String serverUrl;
@@ -27,6 +30,7 @@ class AuthState {
 
   AuthState copyWith({
     bool? isAuthenticated,
+    bool? isInitialized,
     String? userName,
     String? userEmail,
     String? serverUrl,
@@ -37,6 +41,7 @@ class AuthState {
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      isInitialized: isInitialized ?? this.isInitialized,
       userName: userName ?? this.userName,
       userEmail: userEmail ?? this.userEmail,
       serverUrl: serverUrl ?? this.serverUrl,
@@ -65,6 +70,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (_api.isAuthenticated && _api.currentUser != null) {
       state = state.copyWith(
         isAuthenticated: true,
+        isInitialized: true,
         userName: _api.currentUser!['name'] as String?,
         userEmail: _api.currentUser!['email'] as String?,
         serverUrl: _api.baseUrl,
@@ -72,6 +78,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         statusMessage: 'Cloud sync active.',
       );
       _startAutoSync();
+    } else {
+      state = state.copyWith(isInitialized: true);
     }
     checkServerHealth();
   }
@@ -112,7 +120,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
-    state = state.copyWith(statusMessage: 'Registering account...');
+    state = state.copyWith(statusMessage: 'Creating account...');
     final result = await _api.register(name: name, email: email, password: password);
 
     if (result['success'] == true) {
@@ -122,7 +130,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         userName: user['name'] as String?,
         userEmail: user['email'] as String?,
         isServerOnline: true,
-        statusMessage: 'Registered and connected to NoteForge backend!',
+        statusMessage: 'Account created successfully!',
       );
       _startAutoSync();
       return true;
@@ -138,7 +146,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
-    state = state.copyWith(statusMessage: 'Logging in...');
+    state = state.copyWith(statusMessage: 'Signing in...');
     final result = await _api.login(email: email, password: password);
 
     if (result['success'] == true) {
@@ -148,13 +156,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
         userName: user['name'] as String?,
         userEmail: user['email'] as String?,
         isServerOnline: true,
-        statusMessage: 'Logged in successfully. Cloud sync ready.',
+        statusMessage: 'Signed in successfully.',
       );
       _startAutoSync();
       return true;
     } else {
       state = state.copyWith(
-        statusMessage: result['error']?.toString() ?? 'Login failed',
+        statusMessage: result['error']?.toString() ?? 'Invalid email or password.',
       );
       return false;
     }
@@ -163,12 +171,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     _autoSyncTimer?.cancel();
     await _api.logout();
+
+    // Clear local notes, folders, and tags so they disappear on logout
+    if (_db != null) {
+      try {
+        await _db!.delete(_db!.noteTags).go();
+        await _db!.delete(_db!.notes).go();
+        await _db!.delete(_db!.folders).go();
+        await _db!.delete(_db!.tags).go();
+      } catch (e) {
+        debugPrint('Error clearing local database on logout: $e');
+      }
+    }
+
     state = state.copyWith(
       isAuthenticated: false,
       isSyncing: false,
       userName: null,
       userEmail: null,
-      statusMessage: 'Logged out. Local mode active.',
+      lastSyncTime: null,
+      statusMessage: 'Logged out.',
     );
   }
 
@@ -176,18 +198,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> syncWithBackend(AppDatabase db, {bool silent = false}) async {
     if (!state.isAuthenticated) {
       if (!silent) {
-        state = state.copyWith(statusMessage: 'Please log in to sync with cloud backend.');
+        state = state.copyWith(statusMessage: 'Please sign in to sync notes.');
       }
       return false;
     }
 
     if (state.isSyncing) {
-      return false; // Prevent concurrent overlapping sync
+      return false;
     }
 
     state = state.copyWith(
       isSyncing: true,
-      statusMessage: silent ? state.statusMessage : 'Syncing notes with backend...',
+      statusMessage: silent ? state.statusMessage : 'Syncing notes...',
     );
 
     try {
@@ -235,7 +257,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (pushResult['success'] != true) {
         state = state.copyWith(
-          statusMessage: pushResult['error']?.toString() ?? 'Cloud push failed',
+          statusMessage: pushResult['error']?.toString() ?? 'Sync push failed',
         );
         return false;
       }
@@ -315,7 +337,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       state = state.copyWith(
         lastSyncTime: timeStr,
-        statusMessage: 'Cloud sync complete at $timeStr.',
+        statusMessage: 'Synced at $timeStr',
       );
       return true;
     } catch (e) {

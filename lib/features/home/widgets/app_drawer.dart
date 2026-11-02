@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noteforge/core/router/app_router.dart';
 import 'package:noteforge/features/folders/providers/folders_provider.dart';
 import 'package:noteforge/features/settings/providers/settings_provider.dart';
+import 'package:noteforge/features/auth/providers/auth_provider.dart';
+import 'package:noteforge/features/auth/screens/auth_dialog.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -41,6 +43,40 @@ class AppDrawer extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+        Consumer(
+          builder: (context, ref, child) {
+            final authState = ref.watch(authProvider);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                tileColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                leading: CircleAvatar(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  radius: 18,
+                  child: Icon(
+                    authState.isAuthenticated ? Icons.person : Icons.person_outline,
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  authState.isAuthenticated ? (authState.userName ?? 'User') : 'My Account',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                subtitle: Text(
+                  authState.isAuthenticated ? (authState.userEmail ?? '') : 'Sign in or create account',
+                  style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  Navigator.pop(context);
+                  AuthDialog.show(context);
+                },
+              ),
+            );
+          },
         ),
         const Divider(indent: 28, endIndent: 28),
         const NavigationDrawerDestination(

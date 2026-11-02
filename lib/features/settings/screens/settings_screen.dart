@@ -24,32 +24,31 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: ListView(
         children: [
-          // Backend & Cloud Sync Section (CPAD Requirement)
-          const _SectionHeader(title: 'Integrated Backend & Cloud Sync'),
+          // Account & Cloud Sync Section
+          const _SectionHeader(title: 'Account & Cloud Sync'),
           ListTile(
             leading: Icon(
-              Icons.cloud_done_rounded,
-              color: authState.isServerOnline ? Colors.green : Colors.orange,
+              authState.isAuthenticated ? Icons.account_circle : Icons.account_circle_outlined,
+              color: authState.isAuthenticated ? Theme.of(context).colorScheme.primary : null,
+              size: 28,
             ),
             title: Text(
-              authState.isAuthenticated
-                  ? 'Account: ${authState.userName}'
-                  : 'Backend Server Connection',
+              authState.isAuthenticated ? (authState.userName ?? 'User') : 'My Account',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               authState.isAuthenticated
-                  ? '${authState.userEmail} • ${authState.serverUrl}'
-                  : 'Status: ${authState.isServerOnline ? 'Server Online' : 'Offline'} • Click to connect',
+                  ? (authState.userEmail ?? '')
+                  : 'Sign in or create account to sync notes',
             ),
             trailing: Chip(
               label: Text(
-                authState.isAuthenticated ? 'Logged In' : 'Local Mode',
+                authState.isAuthenticated ? 'Signed In' : 'Sign In',
                 style: const TextStyle(fontSize: 11),
               ),
               backgroundColor: authState.isAuthenticated
                   ? Colors.green.withValues(alpha: 0.15)
-                  : Colors.grey.withValues(alpha: 0.15),
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
             onTap: () => AuthDialog.show(context),
           ),
@@ -62,11 +61,11 @@ class SettingsScreen extends ConsumerWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.sync),
-              title: const Text('Sync Notes with Cloud'),
+              title: const Text('Sync Notes'),
               subtitle: Text(
                 authState.lastSyncTime != null
                     ? 'Last synced at ${authState.lastSyncTime}'
-                    : 'Tap to push & pull latest changes',
+                    : 'Tap to sync latest changes',
               ),
               onTap: authState.isSyncing
                   ? null
@@ -77,10 +76,7 @@ class SettingsScreen extends ConsumerWidget {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                              ref.read(authProvider).statusMessage ??
-                                  (success ? 'Sync complete!' : 'Sync failed'),
-                            ),
+                            content: Text(success ? 'Notes synced!' : 'Sync failed. Check connection.'),
                             backgroundColor: success ? Colors.green : Colors.red,
                           ),
                         );
@@ -137,12 +133,6 @@ class SettingsScreen extends ConsumerWidget {
             leading: Icon(Icons.info_outline),
             title: Text(AppConstants.appName),
             subtitle: Text('Version ${AppConstants.appVersion}'),
-          ),
-          const ListTile(
-            leading: Icon(Icons.school_outlined),
-            title: Text('Built for Students'),
-            subtitle:
-                Text('A powerful note-taking app designed for learning'),
           ),
         ],
       ),
