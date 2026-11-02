@@ -12,7 +12,7 @@ class ApiService {
   /// Default production cloud API endpoint.
   /// When deployed to Render, Railway, or custom cloud host, worldwide multi-device sync
   /// connects seamlessly to this public HTTPS URL with zero user configuration.
-  static const String defaultCloudUrl = 'https://noteforge-api.onrender.com';
+  static const String defaultCloudUrl = 'https://noteforge-api-z9cr.onrender.com';
   static const String fallbackLocalUrl = 'http://localhost:5000';
 
   String _token = '';
@@ -84,7 +84,12 @@ class ApiService {
         _token = data['token'] as String? ?? '';
         _currentUser = data['user'] as Map<String, dynamic>?;
         if (data['baseUrl'] != null && (data['baseUrl'] as String).isNotEmpty) {
-          _baseUrl = data['baseUrl'] as String;
+          final savedUrl = data['baseUrl'] as String;
+          if (savedUrl.contains('noteforge-api.onrender.com')) {
+            _baseUrl = defaultCloudUrl;
+          } else {
+            _baseUrl = savedUrl;
+          }
         }
       }
     } catch (e) {
