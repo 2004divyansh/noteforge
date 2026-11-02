@@ -71,27 +71,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isServerOnline: true,
         statusMessage: 'Cloud sync active.',
       );
-      if (_db != null) {
-        syncWithBackend(_db!, silent: true);
-        _startAutoSync();
-      }
+      _startAutoSync();
     }
     checkServerHealth();
   }
 
-  /// Attach active database instance for automatic background sync
-  void attachDatabase(AppDatabase db) {
+  void setDatabase(AppDatabase db) {
     _db = db;
-    if (state.isAuthenticated) {
-      syncWithBackend(db, silent: true);
-      _startAutoSync();
-    }
   }
 
   void _startAutoSync() {
     _autoSyncTimer?.cancel();
-    // Silent periodic background sync every 30 seconds
-    _autoSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Silent periodic background sync every 60 seconds
+    _autoSyncTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (state.isAuthenticated && _db != null && !state.isSyncing) {
         syncWithBackend(_db!, silent: true);
       }
@@ -173,6 +165,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _api.logout();
     state = state.copyWith(
       isAuthenticated: false,
+      isSyncing: false,
       userName: null,
       userEmail: null,
       statusMessage: 'Logged out. Local mode active.',
@@ -186,6 +179,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = state.copyWith(statusMessage: 'Please log in to sync with cloud backend.');
       }
       return false;
+    }
+
+    if (state.isSyncing) {
+      return false; // Prevent concurrent overlapping sync
     }
 
     state = state.copyWith(
@@ -238,7 +235,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (pushResult['success'] != true) {
         state = state.copyWith(
-          isSyncing: false,
           statusMessage: pushResult['error']?.toString() ?? 'Cloud push failed',
         );
         return false;
@@ -318,21 +314,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
       state = state.copyWith(
-        isSyncing: false,
         lastSyncTime: timeStr,
         statusMessage: 'Cloud sync complete at $timeStr.',
       );
       return true;
     } catch (e) {
       state = state.copyWith(
-        isSyncing: false,
         statusMessage: 'Sync error: $e',
       );
       return false;
+    } finally {
+      state = state.copyWith(isSyncing: false);
     }
   }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  final db = ref.watch(databaseProvider);
+  final notifier = AuthNotifier();
+  notifier.setDatabase(db);
+  return notifier;
 });

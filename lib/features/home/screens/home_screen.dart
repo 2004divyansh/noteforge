@@ -9,7 +9,6 @@ import 'package:noteforge/features/settings/providers/settings_provider.dart';
 import 'package:noteforge/features/folders/providers/folders_provider.dart';
 import 'package:noteforge/features/auth/providers/auth_provider.dart';
 import 'package:noteforge/features/auth/screens/auth_dialog.dart';
-import 'package:noteforge/core/database/database.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -22,12 +21,6 @@ class HomeScreen extends ConsumerWidget {
         ? ref.watch(notesByFolderProvider(selectedFolder))
         : ref.watch(activeNotesProvider);
     final foldersAsync = ref.watch(foldersProvider);
-    final db = ref.watch(databaseProvider);
-
-    // Ensure database is attached for background cloud sync
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(authProvider.notifier).attachDatabase(db);
-    });
 
     // Get folder name for title
     String title = 'All Notes';
@@ -45,7 +38,6 @@ class HomeScreen extends ConsumerWidget {
           Consumer(
             builder: (context, ref, child) {
               final authState = ref.watch(authProvider);
-              final db = ref.watch(databaseProvider);
               return IconButton(
                 icon: authState.isSyncing
                     ? const SizedBox(
@@ -62,14 +54,10 @@ class HomeScreen extends ConsumerWidget {
                             : null,
                       ),
                 tooltip: authState.isAuthenticated
-                    ? 'Sync with Backend (${authState.userEmail})'
+                    ? 'Cloud Account (${authState.userEmail})'
                     : 'Connect to Backend / Cloud Sync',
                 onPressed: () {
-                  if (authState.isAuthenticated) {
-                    ref.read(authProvider.notifier).syncWithBackend(db);
-                  } else {
-                    AuthDialog.show(context);
-                  }
+                  AuthDialog.show(context);
                 },
               );
             },
