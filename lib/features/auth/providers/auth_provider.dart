@@ -197,6 +197,46 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> loginWithGoogleOAuthToken({
+    required String token,
+    required String email,
+    required String name,
+  }) async {
+    await _api.saveOAuthToken(token: token, email: email, name: name);
+    state = state.copyWith(
+      isAuthenticated: true,
+      userName: name,
+      userEmail: email,
+      isServerOnline: true,
+      statusMessage: 'Signed in with Google!',
+    );
+    _startAutoSync();
+    return true;
+  }
+
+  Future<bool> loginWithGoogleCode(String code) async {
+    state = state.copyWith(statusMessage: 'Verifying Google authorization code...');
+    final result = await _api.exchangeGoogleCode(code);
+
+    if (result['success'] == true) {
+      final user = result['user'] as Map<String, dynamic>;
+      state = state.copyWith(
+        isAuthenticated: true,
+        userName: user['name'] as String?,
+        userEmail: user['email'] as String?,
+        isServerOnline: true,
+        statusMessage: 'Signed in with Google!',
+      );
+      _startAutoSync();
+      return true;
+    } else {
+      state = state.copyWith(
+        statusMessage: result['error']?.toString() ?? 'Invalid authorization code.',
+      );
+      return false;
+    }
+  }
+
   Future<bool> resetPassword({
     required String email,
     required String newPassword,

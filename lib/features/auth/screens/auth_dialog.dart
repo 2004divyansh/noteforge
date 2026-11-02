@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noteforge/core/database/database.dart';
+import 'package:noteforge/core/services/api_service.dart';
 import 'package:noteforge/features/auth/providers/auth_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthDialog extends ConsumerStatefulWidget {
   const AuthDialog({super.key});
@@ -75,7 +79,6 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
       });
 
       if (success) {
-        // Automatically sync notes upon login/registration
         final db = ref.read(databaseProvider);
         authNotifier.syncWithBackend(db);
 
@@ -94,102 +97,245 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
     }
   }
 
+  Future<void> _launchOAuthUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
+    try {
+      if (Platform.isWindows) {
+        await Process.run('cmd', ['/c', 'start', '', url]);
+      } else if (Platform.isLinux) {
+        await Process.run('xdg-open', [url]);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _handleGoogleSignIn() async {
-    final googleEmailController = TextEditingController(text: _emailController.text.trim());
-    final googleNameController = TextEditingController(text: _nameController.text.trim());
-
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            GoogleLogoIcon(size: 22),
-            SizedBox(width: 10),
-            Text('Sign in with Google', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter your Google account email to sign in or connect with NoteForge:',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: googleEmailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Google Email',
-                prefixIcon: Icon(Icons.email_outlined),
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: googleNameController,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Display Name (optional)',
-                prefixIcon: Icon(Icons.person_outline),
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              if (googleEmailController.text.contains('@')) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            icon: const Icon(Icons.check, size: 18),
-            label: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-
-    if (proceed != true || !mounted) return;
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    final email = googleEmailController.text.trim();
-    final name = googleNameController.text.trim().isNotEmpty
-        ? googleNameController.text.trim()
-        : email.split('@')[0];
+    HttpServer? loopbackServer;
+    int? port;
 
-    final authNotifier = ref.read(authProvider.notifier);
-    final success = await authNotifier.loginWithGoogle(email: email, name: name);
+    try {
+      loopbackServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      port = loopbackServer.port;
+    } catch (e) {
+      debugPrint('Could not bind loopback server: $e');
+    }
+
+    final authUrl = ApiService.instance.getGoogleOAuthStartUrl(redirectPort: port);
+
+    // Launch browser for Google OAuth flow
+    await _launchOAuthUrl(authUrl);
+
+    if (!mounted) {
+      loopbackServer?.close(force: true);
+      return;
+    }
+
+    final codeController = TextEditingController();
+    bool dialogOpen = true;
+
+    StreamSubscription<HttpRequest>? loopbackSub;
+    if (loopbackServer != null) {
+      loopbackSub = loopbackServer.listen((HttpRequest request) async {
+        if (request.uri.path == '/callback') {
+          final token = request.uri.queryParameters['token'];
+          final email = request.uri.queryParameters['email'] ?? 'Google User';
+          final name = request.uri.queryParameters['name'] ?? email.split('@')[0];
+
+          request.response.headers.contentType = ContentType.html;
+          request.response.write('''
+            <!DOCTYPE html>
+            <html>
+            <head><title>Signed In</title></head>
+            <body style="font-family:sans-serif;text-align:center;padding:50px;">
+              <h2 style="color:#10b981;">✓ Successfully Signed In!</h2>
+              <p>You can close this tab and return to NoteForge.</p>
+              <script>setTimeout(function(){ window.close(); }, 1500);</script>
+            </body>
+            </html>
+          ''');
+          await request.response.close();
+
+          if (token != null && mounted) {
+            final authNotifier = ref.read(authProvider.notifier);
+            await authNotifier.loginWithGoogleOAuthToken(
+              token: token,
+              email: Uri.decodeComponent(email),
+              name: Uri.decodeComponent(name),
+            );
+
+            final db = ref.read(databaseProvider);
+            authNotifier.syncWithBackend(db);
+
+            if (dialogOpen && mounted) {
+              Navigator.of(context, rootNavigator: true).pop(true);
+            }
+          }
+        }
+      });
+    }
+
+    bool isSubmittingCode = false;
+    String? dialogError;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: const Row(
+              children: [
+                GoogleLogoIcon(size: 24),
+                SizedBox(width: 12),
+                Text('Google Sign-In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'We opened Google Sign-In in your browser. Choose your Google Account there to continue.',
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Listening for browser sign-in...',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          'OR ENTER CODE',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(ctx).colorScheme.outline,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'If the browser displayed a 6-digit code, enter it below:',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: codeController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
+                    decoration: const InputDecoration(
+                      hintText: '000000',
+                      counterText: '',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                  if (dialogError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(dialogError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: isSubmittingCode
+                    ? null
+                    : () async {
+                        final code = codeController.text.trim();
+                        if (code.length != 6) {
+                          setDialogState(() {
+                            dialogError = 'Please enter the 6-digit code from the browser.';
+                          });
+                          return;
+                        }
+                        setDialogState(() {
+                          isSubmittingCode = true;
+                          dialogError = null;
+                        });
+                        final authNotifier = ref.read(authProvider.notifier);
+                        final success = await authNotifier.loginWithGoogleCode(code);
+                        if (success) {
+                          final db = ref.read(databaseProvider);
+                          authNotifier.syncWithBackend(db);
+                          if (ctx.mounted) Navigator.pop(ctx, true);
+                        } else {
+                          setDialogState(() {
+                            isSubmittingCode = false;
+                            dialogError = ref.read(authProvider).statusMessage ?? 'Invalid code.';
+                          });
+                        }
+                      },
+                child: const Text('Verify Code'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    dialogOpen = false;
+    await loopbackSub?.cancel();
+    await loopbackServer?.close(force: true);
 
     if (mounted) {
       setState(() {
         _isLoading = false;
-        if (!success) {
-          _errorMessage = ref.read(authProvider).statusMessage ?? 'Google authentication failed.';
-        }
       });
 
-      if (success) {
-        final db = ref.read(databaseProvider);
-        authNotifier.syncWithBackend(db);
-
+      if (result == true) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Signed in as $email! Notes synced.'),
+          const SnackBar(
+            content: Text('Signed in with Google! Notes synced.'),
             backgroundColor: Colors.green,
           ),
         );

@@ -74,6 +74,7 @@ async function runTests() {
     assert(login.status === 200 && login.data.token, 'User Login & Authentication');
 
     // 3a. Google OAuth Sign In
+    const googleEmail = `google_${Date.now()}@gmail.com`;
     const googleAuth = await request(
       {
         host: '127.0.0.1',
@@ -82,11 +83,50 @@ async function runTests() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       },
-      { email: `google_${Date.now()}@gmail.com`, name: 'Google User' }
+      { email: googleEmail, name: 'Google User' }
     );
     assert(googleAuth.status === 200 && googleAuth.data.token, 'Google OAuth Sign In & Auto-Registration');
 
-    // 3b. Reset Password
+    // 3b. Verify Google OAuth account CANNOT be logged in via normal password login
+    const blockedLogin = await request(
+      {
+        host: '127.0.0.1',
+        port: 5000,
+        path: '/api/auth/login',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      },
+      { email: googleEmail, password: 'anyPassword123' }
+    );
+    assert(blockedLogin.status === 400 && blockedLogin.data.error.includes('Google'), 'Normal Password Login BLOCKED for Google OAuth Account');
+
+    // 3c. Verify Google OAuth account CANNOT be registered via password
+    const blockedRegister = await request(
+      {
+        host: '127.0.0.1',
+        port: 5000,
+        path: '/api/auth/register',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      },
+      { name: 'Google User Duplicate', email: googleEmail, password: 'password123' }
+    );
+    assert(blockedRegister.status === 400 && blockedRegister.data.error.includes('Google'), 'Password Registration BLOCKED for Google OAuth Account');
+
+    // 3d. Verify Google OAuth account CANNOT reset password
+    const blockedReset = await request(
+      {
+        host: '127.0.0.1',
+        port: 5000,
+        path: '/api/auth/reset-password',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      },
+      { email: googleEmail, newPassword: 'newPassword123' }
+    );
+    assert(blockedReset.status === 400 && blockedReset.data.error.includes('Google'), 'Password Reset BLOCKED for Google OAuth Account');
+
+    // 3e. Reset Password for standard local account
     const reset = await request(
       {
         host: '127.0.0.1',

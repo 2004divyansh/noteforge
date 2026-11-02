@@ -15,6 +15,8 @@ db.exec(`
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    auth_provider TEXT DEFAULT 'local',
+    google_id TEXT,
     created_at TEXT NOT NULL
   );
 
@@ -69,6 +71,17 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 `);
+
+// Graceful column migrations for existing databases
+try {
+  db.exec("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local';");
+} catch (_) {}
+try {
+  db.exec("ALTER TABLE users ADD COLUMN google_id TEXT;");
+} catch (_) {}
+try {
+  db.exec("UPDATE users SET auth_provider = 'google' WHERE password_hash = 'google_oauth_account';");
+} catch (_) {}
 
 module.exports = db;
 
