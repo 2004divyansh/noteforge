@@ -55,3 +55,4 @@ You will see:
 - Passwords are salted and hashed using `bcryptjs` before storage.
 - Private routes are protected with JWT bearer tokens.
 - SQL injection protection via parameterized queries (`DatabaseSync.prepare`).
+

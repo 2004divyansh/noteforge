@@ -8,6 +8,7 @@ import 'package:noteforge/core/database/database.dart';
 import 'package:noteforge/features/editor/widgets/editor_toolbar.dart';
 import 'package:noteforge/features/editor/widgets/tag_selector.dart';
 import 'package:noteforge/features/export/services/export_service.dart';
+import 'package:noteforge/features/auth/providers/auth_provider.dart';
 
 class EditorScreen extends ConsumerStatefulWidget {
   const EditorScreen({super.key, this.noteId});
@@ -104,6 +105,12 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     }
 
     setState(() => _hasUnsavedChanges = false);
+
+    // Auto-sync in background if connected to backend
+    final authState = ref.read(authProvider);
+    if (authState.isAuthenticated) {
+      ref.read(authProvider.notifier).syncWithBackend(db);
+    }
   }
 
   @override

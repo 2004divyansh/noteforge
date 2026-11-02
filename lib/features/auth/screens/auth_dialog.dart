@@ -79,9 +79,13 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
       });
 
       if (success) {
+        // Automatically sync notes upon login/registration
+        final db = ref.read(databaseProvider);
+        authNotifier.syncWithBackend(db);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ref.read(authProvider).statusMessage ?? 'Connected!'),
+            content: Text(ref.read(authProvider).statusMessage ?? 'Connected! Syncing notes...'),
             backgroundColor: Colors.green,
           ),
         );

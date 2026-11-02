@@ -204,6 +204,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
             id: Value(fMap['id'] as String),
             name: Value(fMap['name'] as String),
             color: Value(fMap['color'] as int? ?? 0xFF6750A4),
+            parentId: Value(fMap['parent_id'] as String?),
+            sortOrder: Value(fMap['sort_order'] as int? ?? 0),
+            createdAt: Value(
+              DateTime.tryParse(fMap['created_at']?.toString() ?? '') ??
+                  DateTime.now(),
+            ),
           );
           await db.into(db.folders).insertOnConflictUpdate(companion);
         }
@@ -215,6 +221,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
             id: Value(tMap['id'] as String),
             name: Value(tMap['name'] as String),
             color: Value(tMap['color'] as int? ?? 0xFFEF5350),
+            createdAt: Value(
+              DateTime.tryParse(tMap['created_at']?.toString() ?? '') ??
+                  DateTime.now(),
+            ),
           );
           await db.into(db.tags).insertOnConflictUpdate(companion);
         }
@@ -227,9 +237,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
             title: Value(nMap['title'] as String? ?? 'Untitled'),
             content: Value(nMap['content'] as String? ?? ''),
             plainText: Value(nMap['plain_text'] as String? ?? ''),
+            folderId: Value(nMap['folder_id'] as String?),
             isPinned: Value(nMap['is_pinned'] == 1),
             isArchived: Value(nMap['is_archived'] == 1),
             isTrashed: Value(nMap['is_trashed'] == 1),
+            trashedAt: Value(
+              nMap['trashed_at'] != null
+                  ? DateTime.tryParse(nMap['trashed_at'].toString())
+                  : null,
+            ),
+            createdAt: Value(
+              DateTime.tryParse(nMap['created_at']?.toString() ?? '') ??
+                  DateTime.now(),
+            ),
+            updatedAt: Value(
+              DateTime.tryParse(nMap['updated_at']?.toString() ?? '') ??
+                  DateTime.now(),
+            ),
           );
           await db.into(db.notes).insertOnConflictUpdate(companion);
         }
