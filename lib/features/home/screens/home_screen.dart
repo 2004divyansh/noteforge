@@ -112,8 +112,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               viewMode == ViewMode.grid ? Icons.view_list : Icons.grid_view,
             ),
             onPressed: () {
-              ref.read(viewModeProvider.notifier).state =
-                  viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid;
+              ref.read(viewModeProvider.notifier).toggle();
             },
             tooltip: viewMode == ViewMode.grid ? 'List view' : 'Grid view',
           ),

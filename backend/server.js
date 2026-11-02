@@ -58,6 +58,7 @@ app.post('/api/admin/reset-db', (req, res) => {
       DELETE FROM folders;
       DELETE FROM tags;
       DELETE FROM users;
+      DELETE FROM deleted_records;
       VACUUM;
     `);
     console.log('🧹 [ADMIN] Database reset successfully. All users, notes, and folders cleared.');
@@ -75,7 +76,8 @@ app.post('/api/admin/reset-db', (req, res) => {
 app.get('/', (req, res) => {
   try {
     const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-    const noteCount = db.prepare('SELECT COUNT(*) as count FROM notes').get().count;
+    const activeNoteCount = db.prepare('SELECT COUNT(*) as count FROM notes WHERE is_trashed = 0').get().count;
+    const trashedNoteCount = db.prepare('SELECT COUNT(*) as count FROM notes WHERE is_trashed = 1').get().count;
     const folderCount = db.prepare('SELECT COUNT(*) as count FROM folders').get().count;
     const tagCount = db.prepare('SELECT COUNT(*) as count FROM tags').get().count;
     const isReset = req.query.reset === 'success';
@@ -172,7 +174,7 @@ app.get('/', (req, res) => {
     <h2>Database Metrics</h2>
     <div class="grid">
       <div class="card"><div class="card-num">${userCount}</div><div class="card-label">Active Users</div></div>
-      <div class="card"><div class="card-num">${noteCount}</div><div class="card-label">Cloud Notes</div></div>
+      <div class="card"><div class="card-num">${activeNoteCount}</div><div class="card-label">Active Notes${trashedNoteCount > 0 ? ` (${trashedNoteCount} in trash)` : ''}</div></div>
       <div class="card"><div class="card-num">${folderCount}</div><div class="card-label">Cloud Folders</div></div>
       <div class="card"><div class="card-num">${tagCount}</div><div class="card-label">Cloud Tags</div></div>
     </div>

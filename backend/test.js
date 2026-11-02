@@ -129,6 +129,40 @@ async function runTests() {
     });
     assert(syncPull.status === 200 && syncPull.data.data.folders.length >= 1 && syncPull.data.data.notes.length >= 2, 'Two-Way Sync Pull Batch from Database');
 
+    // 8. Test Two-Way Sync Deletion
+    const syncDelete = await request(
+      {
+        host: '127.0.0.1',
+        port: 5000,
+        path: '/api/sync/push',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      },
+      {
+        deletedNoteIds: ['n_sync_1']
+      }
+    );
+    assert(syncDelete.status === 200 && syncDelete.data.success, 'Sync Deletion Batch to Database');
+
+    // 9. Verify Deletion in Pull
+    const syncPullAfterDelete = await request({
+      host: '127.0.0.1',
+      port: 5000,
+      path: '/api/sync/pull',
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    assert(
+      syncPullAfterDelete.status === 200 &&
+      syncPullAfterDelete.data.data.deletedNoteIds &&
+      syncPullAfterDelete.data.data.deletedNoteIds.includes('n_sync_1') &&
+      !syncPullAfterDelete.data.data.notes.some(n => n.id === 'n_sync_1'),
+      'Sync Pull Confirms Deleted Note Removed'
+    );
+
     console.log(`\n🎉 Results: ${passed} Passed, ${failed} Failed.`);
     process.exit(failed > 0 ? 1 : 0);
   } catch (err) {

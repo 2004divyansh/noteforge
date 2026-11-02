@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noteforge/core/database/database.dart';
 import 'package:noteforge/core/services/api_service.dart';
+import 'package:noteforge/core/services/deletion_tracker.dart';
 
 class AuthState {
   const AuthState({
@@ -247,15 +248,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'updatedAt': n.updatedAt.toIso8601String(),
       }).toList();
 
+      // Gather any locally deleted note IDs to sync with backend
+      final deletedNoteIds = await DeletionTracker.getDeletedNoteIds();
+
       // Push local state to backend
       final pushResult = await _api.pushSync(
         folders: foldersPayload,
         tags: tagsPayload,
         notes: notesPayload,
         noteTags: [],
+        deletedNoteIds: deletedNoteIds,
       );
 
-      if (pushResult['success'] != true) {
+      if (pushResult['success'] == true) {
+        // Clear successfully synced deletions
+        await DeletionTracker.clearDeletedNoteIds(deletedNoteIds);
+      } else {
         state = state.copyWith(
           statusMessage: pushResult['error']?.toString() ?? 'Sync push failed',
         );
@@ -269,6 +277,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final remoteNotes = data['notes'] as List<dynamic>? ?? [];
         final remoteFolders = data['folders'] as List<dynamic>? ?? [];
         final remoteTags = data['tags'] as List<dynamic>? ?? [];
+        final remoteDeletedNoteIds =
+            (data['deletedNoteIds'] as List<dynamic>? ?? [])
+                .map((e) => e.toString())
+                .toList();
+
+        // Remove remotely deleted notes from local storage
+        for (final delId in remoteDeletedNoteIds) {
+          await db.notesDao.deleteNote(delId, trackForSync: false);
+        }
 
         // Insert/merge remote folders
         for (final f in remoteFolders) {
@@ -302,11 +319,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
           await db.into(db.tags).insertOnConflictUpdate(companion);
         }
 
-        // Insert/merge remote notes
+        // Insert/merge remote notes (with Last-Write-Wins check)
         for (final n in remoteNotes) {
           final nMap = n as Map<String, dynamic>;
+          final noteId = nMap['id'] as String;
+
+          final localNote = await db.notesDao.getNoteById(noteId);
+          final remoteUpdated =
+              DateTime.tryParse(nMap['updated_at']?.toString() ?? '') ??
+                  DateTime.now();
+
+          // If local note exists and was modified strictly after remote update, keep local
+          if (localNote != null && localNote.updatedAt.isAfter(remoteUpdated)) {
+            continue;
+          }
+
           final companion = NotesCompanion(
-            id: Value(nMap['id'] as String),
+            id: Value(noteId),
             title: Value(nMap['title'] as String? ?? 'Untitled'),
             content: Value(nMap['content'] as String? ?? ''),
             plainText: Value(nMap['plain_text'] as String? ?? ''),
@@ -323,10 +352,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
               DateTime.tryParse(nMap['created_at']?.toString() ?? '') ??
                   DateTime.now(),
             ),
-            updatedAt: Value(
-              DateTime.tryParse(nMap['updated_at']?.toString() ?? '') ??
-                  DateTime.now(),
-            ),
+            updatedAt: Value(remoteUpdated),
           );
           await db.into(db.notes).insertOnConflictUpdate(companion);
         }

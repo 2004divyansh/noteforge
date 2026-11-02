@@ -231,6 +231,11 @@ router.delete('/:id', (req, res) => {
       return res.status(404).json({ success: false, error: 'Note not found.' });
     }
 
+    db.prepare(`
+      INSERT OR REPLACE INTO deleted_records (id, user_id, entity_type, deleted_at)
+      VALUES (?, ?, 'note', ?)
+    `).run(noteId, userId, new Date().toISOString());
+
     return res.json({ success: true, message: 'Note deleted permanently.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Failed to delete note.' });

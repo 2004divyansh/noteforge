@@ -189,6 +189,7 @@ class ApiService {
     required List<Map<String, dynamic>> tags,
     required List<Map<String, dynamic>> notes,
     required List<Map<String, dynamic>> noteTags,
+    List<String> deletedNoteIds = const [],
   }) async {
     if (!isAuthenticated) {
       return {'success': false, 'error': 'Authentication required to sync.'};
@@ -203,6 +204,7 @@ class ApiService {
           'tags': tags,
           'notes': notes,
           'noteTags': noteTags,
+          'deletedNoteIds': deletedNoteIds,
         }),
       );
 

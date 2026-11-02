@@ -334,3 +334,4 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
     );
   }
 }
+

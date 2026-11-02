@@ -111,10 +111,64 @@ class AppLockNotifier extends StateNotifier<bool> {
   }
 }
 
-// View mode provider (list or grid)
-final viewModeProvider = StateProvider<ViewMode>((ref) => ViewMode.grid);
-
+// View mode enum
 enum ViewMode { list, grid }
+
+// Persistent View mode notifier & provider
+class ViewModeNotifier extends StateNotifier<ViewMode> {
+  ViewModeNotifier() : super(ViewMode.grid) {
+    _loadViewMode();
+  }
+
+  Future<void> _loadViewMode() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File(p.join(dir.path, 'NoteForge', 'settings.json'));
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final settings = json.decode(content) as Map<String, dynamic>;
+        final mode = settings['viewMode'] as String?;
+        if (mode == 'list') {
+          state = ViewMode.list;
+        } else if (mode == 'grid') {
+          state = ViewMode.grid;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> toggle() async {
+    final next = state == ViewMode.grid ? ViewMode.list : ViewMode.grid;
+    state = next;
+    await _saveViewMode(next);
+  }
+
+  Future<void> setViewMode(ViewMode mode) async {
+    state = mode;
+    await _saveViewMode(mode);
+  }
+
+  Future<void> _saveViewMode(ViewMode mode) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File(p.join(dir.path, 'NoteForge', 'settings.json'));
+      Map<String, dynamic> settings = {};
+      if (await file.exists()) {
+        settings = json.decode(await file.readAsString()) as Map<String, dynamic>;
+      }
+      settings['viewMode'] = mode.name;
+      if (!await file.parent.exists()) {
+        await file.parent.create(recursive: true);
+      }
+      await file.writeAsString(json.encode(settings));
+    } catch (_) {}
+  }
+}
+
+final viewModeProvider =
+    StateNotifierProvider<ViewModeNotifier, ViewMode>((ref) {
+  return ViewModeNotifier();
+});
 
 // Selected folder provider
 final selectedFolderProvider = StateProvider<String?>((ref) => null);

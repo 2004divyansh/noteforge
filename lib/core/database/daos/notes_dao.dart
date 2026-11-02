@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:noteforge/core/database/database.dart';
 import 'package:noteforge/core/database/tables.dart';
+import 'package:noteforge/core/services/deletion_tracker.dart';
 
 part 'notes_dao.g.dart';
 
@@ -69,70 +70,93 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
 
   // Move note to trash
   Future<void> trashNote(String id) {
+    final now = DateTime.now();
     return (update(notes)..where((n) => n.id.equals(id))).write(
       NotesCompanion(
         isTrashed: const Value(true),
-        trashedAt: Value(DateTime.now()),
+        trashedAt: Value(now),
+        updatedAt: Value(now),
       ),
     );
   }
 
   // Restore note from trash
   Future<void> restoreNote(String id) {
+    final now = DateTime.now();
     return (update(notes)..where((n) => n.id.equals(id))).write(
-      const NotesCompanion(
-        isTrashed: Value(false),
-        trashedAt: Value(null),
+      NotesCompanion(
+        isTrashed: const Value(false),
+        trashedAt: const Value(null),
+        updatedAt: Value(now),
       ),
     );
   }
 
   // Permanently delete a note
-  Future<void> deleteNote(String id) async {
+  Future<void> deleteNote(String id, {bool trackForSync = true}) async {
+    if (trackForSync) {
+      await DeletionTracker.trackDeletedNoteId(id);
+    }
     await (delete(noteTags)..where((nt) => nt.noteId.equals(id))).go();
     await (delete(notes)..where((n) => n.id.equals(id))).go();
   }
 
   // Empty trash (delete all trashed notes)
   Future<void> emptyTrash() async {
-    final trashedNotes = await (select(notes)..where((n) => n.isTrashed.equals(true))).get();
+    final trashedNotes =
+        await (select(notes)..where((n) => n.isTrashed.equals(true))).get();
     for (final note in trashedNotes) {
-      await deleteNote(note.id);
+      await deleteNote(note.id, trackForSync: true);
     }
   }
 
   // Toggle pin
   Future<void> togglePin(String id, bool isPinned) {
     return (update(notes)..where((n) => n.id.equals(id))).write(
-      NotesCompanion(isPinned: Value(!isPinned)),
+      NotesCompanion(
+        isPinned: Value(!isPinned),
+        updatedAt: Value(DateTime.now()),
+      ),
     );
   }
 
   // Toggle archive
   Future<void> toggleArchive(String id, bool isArchived) {
     return (update(notes)..where((n) => n.id.equals(id))).write(
-      NotesCompanion(isArchived: Value(!isArchived)),
+      NotesCompanion(
+        isArchived: Value(!isArchived),
+        updatedAt: Value(DateTime.now()),
+      ),
     );
   }
 
   // Unarchive note
   Future<void> unarchiveNote(String id) {
     return (update(notes)..where((n) => n.id.equals(id))).write(
-      const NotesCompanion(isArchived: Value(false)),
+      NotesCompanion(
+        isArchived: const Value(false),
+        updatedAt: Value(DateTime.now()),
+      ),
     );
   }
 
   // Archive note
   Future<void> archiveNote(String id) {
     return (update(notes)..where((n) => n.id.equals(id))).write(
-      const NotesCompanion(isArchived: Value(true)),
+      NotesCompanion(
+        isArchived: const Value(true),
+        updatedAt: Value(DateTime.now()),
+      ),
     );
   }
 
   // Move note to folder
   Future<void> moveToFolder(String noteId, String? folderId) {
     return (update(notes)..where((n) => n.id.equals(noteId))).write(
-      NotesCompanion(folderId: Value(folderId)),
+      NotesCompanion(
+        folderId: Value(folderId),
+        updatedAt: Value(DateTime.now()),
+      ),
     );
   }
 

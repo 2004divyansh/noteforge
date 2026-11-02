@@ -60,6 +60,14 @@ db.exec(`
     PRIMARY KEY (note_id, tag_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS deleted_records (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    deleted_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 module.exports = db;
